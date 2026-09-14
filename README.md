@@ -90,6 +90,7 @@ Mahasiswa merupakan pengguna utama Campus Ghost karena mereka paling sering berp
 ### Contoh Persona
 
 **Nama:** Nicolas  
+**NIM:** 2410101011
 **Status:** Mahasiswa  
 **Situasi:** Akan mengerjakan tugas di kampus.
 
@@ -438,25 +439,7 @@ Wi-Fi Gedung 1 Lt. 3
 
 Agar project tidak terlalu besar, versi pertama Campus Ghost hanya berfokus pada:
 
-```text
-┌──────────────────────────────┐
-│        CAMPUS GHOST          │
-├──────────────────────────────┤
-│                              │
-│        Campus Map            │
-│             ↓                │
-│       Location Detail        │
-│             ↓                │
-│       Live Incidents         │
-│             ↓                │
-│       Report Issue           │
-│             ↓                │
-│       Incident Grouping      │
-│             ↓                │
-│        Status Update         │
-│                              │
-└──────────────────────────────┘
-```
+![alt text](image-1.png)
 
 Fokus project bukan membuat sistem kampus yang sangat kompleks, tetapi membuktikan konsep:
 
@@ -606,34 +589,7 @@ incidents/
 
 ## Arsitektur Aplikasi
 
-```text
-┌─────────────────────────────────────┐
-│           CAMPUS GHOST              │
-│         (Flutter App)               │
-├─────────────────────────────────────┤
-│                                     │
-│  ┌───────────┐    ┌──────────────┐  │
-│  │    UI      │    │   State      │  │
-│  │  (Widgets) │◄──►│  Management  │  │
-│  │            │    │  (Provider/  │  │
-│  │            │    │   Riverpod)  │  │
-│  └───────────┘    └──────┬───────┘  │
-│                          │          │
-│                 ┌────────▼───────┐  │
-│                 │   Repository   │  │
-│                 │     Layer      │  │
-│                 └────────┬───────┘  │
-│                          │          │
-├──────────────────────────┼──────────┤
-│                          │          │
-│  ┌───────────────────────▼───────┐  │
-│  │         FIREBASE              │  │
-│  │                               │  │
-│  │  Firestore  Auth  Storage     │  │
-│  └───────────────────────────────┘  │
-│                                     │
-└─────────────────────────────────────┘
-```
+![alt text](image.png)
 
 ---
 
