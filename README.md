@@ -8,7 +8,7 @@
 
 Konsep utamanya bukan menggantikan Google Maps, tetapi menjadi **"live condition map" untuk lingkungan kampus**.
 
-> **Ide utama:** *"Apa yang sedang terjadi di kampus sekarang?"*
+> **Ide utama:** _"Apa yang sedang terjadi di kampus sekarang?"_
 
 Aplikasi mengubah laporan mahasiswa menjadi informasi kondisi fasilitas yang mudah dipahami. Beberapa laporan yang berada pada lokasi dan masalah yang sama dapat dikelompokkan menjadi satu **incident** sehingga pengguna tidak perlu melihat banyak laporan yang sebenarnya membahas masalah yang sama.
 
@@ -479,6 +479,234 @@ Solusi yang diberikan:
 Nilai unik project:
 
 > **"Bukan sekadar peta kampus, tetapi peta kondisi kampus saat ini."**
+
+---
+
+# Tech Stack
+
+## Framework — Flutter (Dart)
+
+Campus Ghost menggunakan **Flutter** sebagai framework utama untuk pengembangan aplikasi mobile.
+
+### Alasan Pemilihan Flutter
+
+| Aspek                     | Penjelasan                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Cross-platform**        | Satu codebase untuk Android dan iOS. Efisien untuk project 12 pertemuan.                        |
+| **UI yang fleksibel**     | Widget system Flutter sangat cocok untuk membuat custom map, card, dan komponen visual lainnya. |
+| **Performa**              | Flutter mengompilasi ke native code, sehingga performa mendekati aplikasi native.               |
+| **Hot Reload**            | Mempercepat proses development — perubahan langsung terlihat tanpa restart aplikasi.            |
+| **Ekosistem & komunitas** | Banyak package yang mendukung (maps, state management, Firebase integration).                   |
+| **Mudah dipelajari**      | Dart relatif mudah dipahami, terutama bagi yang sudah familiar dengan JavaScript atau Java.     |
+
+### Versi & Tools
+
+```text
+Flutter SDK     : Latest stable (3.x)
+Dart SDK        : Latest stable (3.x)
+IDE             : Android Studio / VS Code
+Min Android SDK : 21 (Android 5.0)
+```
+
+### Package Utama yang Direncanakan
+
+```text
+flutter_map / google_maps_flutter   → Peta kampus
+firebase_core                       → Koneksi Firebase
+cloud_firestore                     → Database real-time
+firebase_auth                       → Autentikasi pengguna
+firebase_storage                    → Upload foto laporan
+provider / riverpod                 → State management
+image_picker                        → Ambil foto dari kamera/galeri
+geolocator                          → Lokasi pengguna (opsional)
+```
+
+---
+
+## Backend — Firebase (Google)
+
+Campus Ghost menggunakan **Firebase** sebagai backend utama.
+
+### Alasan Pemilihan Firebase
+
+| Aspek                       | Penjelasan                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Real-time Database**      | Cloud Firestore mendukung sinkronisasi data secara real-time — cocok untuk live campus status. |
+| **Tanpa server management** | Firebase adalah Backend-as-a-Service (BaaS), tidak perlu setup dan maintain server sendiri.    |
+| **Autentikasi mudah**       | Firebase Auth mendukung email/password dan Google Sign-In.                                     |
+| **Cloud Storage**           | Untuk menyimpan foto laporan dari pengguna.                                                    |
+| **Free tier cukup**         | Spark plan (gratis) sudah cukup untuk skala MVP dan demonstrasi.                               |
+| **Integrasi Flutter**       | FlutterFire menyediakan plugin resmi dengan dokumentasi lengkap.                               |
+| **Cepat di-setup**          | Cocok untuk timeline 12 pertemuan — tidak perlu banyak waktu untuk konfigurasi backend.        |
+
+### Layanan Firebase yang Digunakan
+
+```text
+┌─────────────────────────────────────────┐
+│            FIREBASE SERVICES            │
+├─────────────────────────────────────────┤
+│                                         │
+│  Cloud Firestore    → Database utama    │
+│                       (reports,         │
+│                        incidents,       │
+│                        locations)       │
+│                                         │
+│  Firebase Auth      → Login pengguna    │
+│                       (email/password,  │
+│                        Google Sign-In)  │
+│                                         │
+│  Cloud Storage      → Simpan foto      │
+│                       laporan           │
+│                                         │
+│  Firebase Hosting   → (Opsional)        │
+│                       Web dashboard     │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### Struktur Data Firestore (Rencana)
+
+```text
+users/
+  └── {userId}
+        ├── name
+        ├── email
+        └── createdAt
+
+locations/
+  └── {locationId}
+        ├── name          → "Gedung 1 Lantai 3"
+        ├── building      → "Gedung 1"
+        ├── floor         → 3
+        ├── latitude
+        └── longitude
+
+reports/
+  └── {reportId}
+        ├── userId
+        ├── locationId
+        ├── category      → "wifi" | "ac" | "printer" | ...
+        ├── description
+        ├── photoUrl
+        ├── status        → "active" | "resolved"
+        ├── createdAt
+        └── incidentId
+
+incidents/
+  └── {incidentId}
+        ├── locationId
+        ├── category
+        ├── reportCount
+        ├── status        → "active" | "resolved"
+        ├── lastUpdated
+        └── firstReported
+```
+
+---
+
+## Arsitektur Aplikasi
+
+```text
+┌─────────────────────────────────────┐
+│           CAMPUS GHOST              │
+│         (Flutter App)               │
+├─────────────────────────────────────┤
+│                                     │
+│  ┌───────────┐    ┌──────────────┐  │
+│  │    UI      │    │   State      │  │
+│  │  (Widgets) │◄──►│  Management  │  │
+│  │            │    │  (Provider/  │  │
+│  │            │    │   Riverpod)  │  │
+│  └───────────┘    └──────┬───────┘  │
+│                          │          │
+│                 ┌────────▼───────┐  │
+│                 │   Repository   │  │
+│                 │     Layer      │  │
+│                 └────────┬───────┘  │
+│                          │          │
+├──────────────────────────┼──────────┤
+│                          │          │
+│  ┌───────────────────────▼───────┐  │
+│  │         FIREBASE              │  │
+│  │                               │  │
+│  │  Firestore  Auth  Storage     │  │
+│  └───────────────────────────────┘  │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+---
+
+## Desain UI/UX
+
+Desain UI/UX untuk Campus Ghost **dibuat dari awal** tanpa menggunakan desain Figma yang sudah ada sebelumnya.
+
+### Pendekatan Desain
+
+```text
+Pertemuan 2-3    → Wireframe sederhana (sketsa layout utama)
+Pertemuan 3-4    → Implementasi UI dasar di Flutter
+Pertemuan 5+     → Iterasi dan perbaikan UI berdasarkan progress
+```
+
+### Prinsip Desain
+
+- **Sederhana dan intuitif** — Pengguna baru harus bisa langsung paham tanpa tutorial.
+- **Informasi cepat terlihat** — Status fasilitas (🟢🟡🔴) harus terlihat dalam 1-2 detik.
+- **Mobile-first** — Semua komponen dirancang untuk layar smartphone.
+- **Konsisten** — Warna, ikon, dan layout mengikuti design system yang sama.
+
+### Halaman Utama yang Akan Dibuat
+
+```text
+1. Splash Screen        → Logo dan loading
+2. Login / Register     → Autentikasi pengguna
+3. Home (Campus Map)    → Peta kampus dengan status
+4. Location Detail      → Detail fasilitas di lokasi tertentu
+5. Incident Detail      → Detail incident dengan daftar laporan
+6. Create Report        → Form buat laporan baru
+7. Report Confirmation  → Konfirmasi laporan berhasil
+8. My Reports           → Riwayat laporan pengguna
+9. Search & Filter      → Pencarian dan filter masalah
+```
+
+---
+
+# Timeline Project — 12 Pertemuan
+
+## Status: Pertemuan 2 dari 12
+
+```text
+[██░░░░░░░░░░] 2/12
+```
+
+### Rencana Per Pertemuan
+
+| Pertemuan | Fokus                                                         | Status             |
+| --------- | ------------------------------------------------------------- | ------------------ |
+| 1         | Ide project, deskripsi masalah, README awal                   | ✅ Selesai         |
+| 2         | Tech stack, setup project Flutter + Firebase, struktur folder | 🔄 Sedang berjalan |
+| 3         | Autentikasi (Login/Register) + Setup Firestore                | ⬜ Belum           |
+| 4         | Campus Map — UI peta kampus dengan lokasi                     | ⬜ Belum           |
+| 5         | Location Detail — Status fasilitas per lokasi                 | ⬜ Belum           |
+| 6         | Report Issue — Form laporan masalah                           | ⬜ Belum           |
+| 7         | Incident Grouping — Logika pengelompokan laporan              | ⬜ Belum           |
+| 8         | Incident Detail — Halaman detail incident                     | ⬜ Belum           |
+| 9         | User Report History — Riwayat laporan                         | ⬜ Belum           |
+| 10        | Search & Filter + Live Campus Status                          | ⬜ Belum           |
+| 11        | Polish UI/UX, bug fixing, optimisasi                          | ⬜ Belum           |
+| 12        | Testing akhir, demo, dokumentasi final                        | ⬜ Belum           |
+
+### Prioritas Pertemuan 2
+
+```text
+✅ Finalisasi tech stack (Flutter + Firebase)
+⬜ Setup project Flutter
+⬜ Konfigurasi Firebase project
+⬜ Buat struktur folder project
+⬜ Setup koneksi Flutter ↔ Firebase
+⬜ Buat halaman dasar (Splash Screen, placeholder Home)
+```
 
 ---
 
