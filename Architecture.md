@@ -618,22 +618,26 @@ For demonstration, seed the following locations in Firestore:
 
 ```text
 Building: Gedung 1
+  - Gedung 1 Lantai B
+  - Gedung 1 Lantai GF
   - Gedung 1 Lantai 1
   - Gedung 1 Lantai 2
   - Gedung 1 Lantai 3
 
 Building: Gedung 2
+  - Gedung 2 Lantai B
+  - Gedung 2 Lantai GF
   - Gedung 2 Lantai 1
   - Gedung 2 Lantai 2
+  - Gedung 2 Lantai 3
 
 Building: Perpustakaan
-  - Perpustakaan Lantai 1
-  - Perpustakaan Lantai 2
+  - Perpustakaan Gedung 1 Lantai GF
 
 Building: Kantin
-  - Kantin Utama
+  - Kantin (Basement)
 
-Building: Parkiran
+Building: Parkiran (Basement)
   - Parkiran Motor
   - Parkiran Mobil
 ```
