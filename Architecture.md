@@ -9,10 +9,13 @@ Help students monitor and report real-time facility conditions on campus. The ap
 ## Stack
 
 - Framework: Flutter (Dart)
-- Backend: Firebase
+- Backend: Firebase (**requires Blaze plan** — see "Backend Architecture Decision" below)
 - Database: Cloud Firestore
 - Authentication: Firebase Auth (Email/Password + Google Sign-In)
 - Storage: Firebase Cloud Storage
+- **Server logic: Cloud Functions for Firebase (Node.js/TypeScript)** — trusted
+  backend for incident grouping, severity scoring, spam/duplicate rejection,
+  and auto-resolve (see below). Client never writes to `incidents` directly.
 - State Management: Riverpod
 - Maps: `flutter_map` + OpenStreetMap tiles (final choice for v1 — no API key/billing required; revisit `google_maps_flutter` only if OSM tile quality becomes an issue post-MVP)
 - Minimum Android SDK: 21 (Android 5.0)
@@ -30,6 +33,40 @@ Help students monitor and report real-time facility conditions on campus. The ap
 - Do not put business logic inside widgets.
 - All Firestore operations go through repository classes.
 - Use Riverpod providers for state management.
+
+---
+
+## Backend Architecture Decision
+
+Earlier drafts of this document kept all incident-grouping, severity, and
+auto-resolve logic on the client to avoid the cost of Firebase's Blaze
+(pay-as-you-go) plan. Review feedback surfaced three concrete problems with
+that approach:
+
+1. **Reliability risk in auto-resolve.** Running the "resolve stale
+   incidents" batch job from a random user's phone means it only runs if
+   *someone happens to open the app*, and a single Firestore `WriteBatch` is
+   capped at 500 writes — an incident with more linked reports than that
+   can't be resolved atomically from the client at all.
+2. **Naive severity scoring.** Severity based purely on `ReportCount` treats
+   5 reports of "toilet out of tissue" as more urgent than 1 report of
+   "electrical short circuit" — count alone doesn't capture risk.
+3. **Spam is trivial to bypass.** The 5-minute duplicate-report check only
+   existed in client code / a Firestore transaction the client itself runs —
+   anyone calling the Firestore SDK/REST API directly (skipping the app)
+   could flood the database with fake reports, since nothing server-side
+   ever validated the request.
+
+**Decision for this version:** move report intake to a **Cloud Function**
+that acts as the single trusted writer for `incidents`, using the Admin SDK
+(which bypasses Security Rules, so rules alone no longer need to carry the
+full burden of validation). This does mean the project must be on the
+**Blaze plan** — Cloud Functions require it even though the free monthly
+quota is large enough that a single-campus MVP is very unlikely to incur
+real cost. If billing is genuinely a hard blocker, the fallback is to keep
+the client-side transaction approach from the previous revision, accept its
+reliability and spam limitations as known MVP trade-offs, and revisit this
+decision before scaling beyond a pilot.
 
 ---
 
@@ -68,8 +105,8 @@ Help students monitor and report real-time facility conditions on campus. The ap
 | Description | String    | Deskripsi masalah                                             |
 | PhotoUrl    | String?   | URL foto laporan (opsional)                                   |
 | Status      | String    | Status laporan: `Active`, `Resolved`                          |
-| IncidentId  | String?   | ID incident yang terkait (nullable, diisi saat dikelompokkan) |
-| CreatedAt   | Timestamp | Waktu laporan dibuat                                          |
+| IncidentId  | String?   | ID incident terkait (diisi Cloud Function saat report masuk, bukan client) |
+| CreatedAt   | Timestamp | Waktu laporan dibuat (server timestamp)                       |
 | UpdatedAt   | Timestamp | Waktu laporan terakhir diperbarui                             |
 
 ### 4. Incident
@@ -85,22 +122,35 @@ Help students monitor and report real-time facility conditions on campus. The ap
 | FirstReportedAt | Timestamp | Waktu laporan pertama                              |
 | LastUpdatedAt   | Timestamp | Waktu terakhir ada laporan baru                    |
 
+> `Severity` bukan fungsi murni dari `ReportCount`. Lihat "Severity Scoring"
+> di bawah — setiap `Category` punya bobot urgensi dasar, jadi 1 laporan
+> kategori berbahaya (mis. kelistrikan) bisa langsung `Critical` walau baru
+> 1 laporan, sementara kategori low-risk (mis. WiFi) butuh laporan lebih
+> banyak untuk naik level.
+
+
 ---
 
 ## Enums
 
 ### ReportCategory
 
-```text
-Wifi
-Ac
-Printer
-Proyektor
-Lift
-Parkir
-Toilet
-Lainnya
-```
+Each category carries a **base urgency weight** used by the severity scoring
+logic below — this is what fixes the "5 reports of empty tissue vs. 1 report
+of a short circuit" problem raised in review. Weights are a starting point,
+tune them with real campus safety input before launch, not engineering
+guesswork.
+
+| Category    | Base Urgency Weight | Rationale                          |
+| ----------- | -------------------- | ----------------------------------- |
+| `Lift`      | 3 (High)              | Trapped-person / fall risk          |
+| `Ac`        | 2 (Medium)            | Can involve electrical component, moderate risk |
+| `Toilet`    | 1 (Low)               | Hygiene/inconvenience, not safety   |
+| `Wifi`      | 1 (Low)               | Inconvenience only                  |
+| `Printer`   | 1 (Low)               | Inconvenience only                  |
+| `Proyektor` | 1 (Low)               | Inconvenience only                  |
+| `Parkir`    | 2 (Medium)            | Can involve safety/security         |
+| `Lainnya`   | 1 (Low, default)      | Unclassified — default to low until triaged |
 
 ### ReportStatus
 
@@ -118,11 +168,28 @@ Resolved
 
 ### FacilitySeverity
 
+Computed from `ReportCount × CategoryUrgencyWeight` (see "Severity Scoring"
+section below), NOT from `ReportCount` alone:
+
 ```text
-Normal      → 🟢 Tidak ada laporan aktif
-Warning     → 🟡 1-2 laporan aktif
-Critical    → 🔴 3+ laporan aktif
+Normal      → 🟢 No active incident at this location
+Warning     → 🟡 Score 1-2
+Critical    → 🔴 Score 3+
 ```
+
+### Severity Scoring (Cloud Function logic)
+
+```text
+score = ReportCount × CategoryUrgencyWeight(incident.Category)
+
+score 1-2  → Severity = "Warning"
+score 3+   → Severity = "Critical"
+```
+
+Example: a `Lift` incident (weight 3) hits Critical (score 3) after just
+**1 report**. A `Wifi` incident (weight 1) needs **3 reports** to reach the
+same Critical score. This directly fixes the "toilet tissue vs. short
+circuit" mismatch raised in review — high-risk categories escalate faster.
 
 ### ActivityStatus (untuk incident)
 
@@ -216,34 +283,26 @@ locations:
 
 reports:
   - All authenticated users can read.
-  - Authenticated user can create report (UserId must match auth UID).
-  - Report owner can update ONLY the `IncidentId` field of their own report
-    (set right after creation, once the matching incident is resolved/created).
-  - Report `Status` is NOT user-writable from the client — it is derived from
-    its parent incident's status (see "Database Rules"), so it can only be
-    changed by whichever process is trusted to write incidents (see below).
-  - Reports cannot be deleted (data integrity).
+  - Authenticated user can create a report with ONLY these client-writable
+    fields: `UserId` (must match auth UID), `LocationId`, `Category`,
+    `Description`, `PhotoUrl`. The client must NOT set `IncidentId`,
+    `Status`, or `CreatedAt` — the rule rejects a create request that
+    includes them (they default to `null` / `"Active"` / server timestamp).
+  - `IncidentId`, `Status`, and `UpdatedAt` are written ONLY by the Cloud
+    Function (via Admin SDK, which bypasses these rules entirely) after it
+    validates and processes the report. No client write path can touch them.
+  - Reports cannot be deleted (data integrity), and cannot be updated by
+    their owner at all — once submitted, only the trusted backend touches it.
 
 incidents:
   - All authenticated users can read.
-  - No arbitrary authenticated user may freely write any field. Client-side
-    writes are restricted by rule to only:
-      - increment `ReportCount` by exactly 1 per write,
-      - update `LastUpdatedAt` to `request.time`,
-      - recompute `Severity` deterministically from the new `ReportCount`
-        (rule validates the new value matches the 1-2 → Warning, 3+ → Critical
-        mapping — client cannot set an arbitrary severity),
-      - create a new incident document with `ReportCount == 1`.
-  - `Status` transitions to `Resolved` are only allowed via the trusted
-    auto-resolve path (Cloud Function), never a direct client write, so a user
-    cannot mark someone else's incident resolved early.
-  - Users cannot directly delete incidents.
-
-NOTE: Firestore security rules can validate individual field-level writes
-(old vs. new values) but cannot safely guarantee atomicity across a
-read-then-write increment. The rule above limits *what* a client is allowed
-to write; the transaction requirement below (see "Database Rules") ensures
-*how* it's written so two simultaneous reports don't lose an increment.
+  - **No client write access at all** — `allow write: if false;` for this
+    collection. Every create/update to `incidents` (increment `ReportCount`,
+    recompute `Severity`, resolve `Status`) happens exclusively inside the
+    Cloud Function, using the Admin SDK, which is not subject to Security
+    Rules. This removes the entire class of client-tampering risk (fake
+    `ReportCount`, arbitrary `Severity`, early self-resolving incidents)
+    that field-level rules could only partially prevent.
 ```
 
 ---
@@ -275,42 +334,56 @@ users/{userId}/profile.jpg:
 
 ## Database Rules
 
-- **Duplicate prevention:** before creating a report, check if the same user
-  already submitted a report for the same `LocationId` + `Category` within
-  the last **5 minutes**. If so, block submission and show the warning in
-  "Error Handling" instead of creating the report.
+All rules below are enforced **server-side, inside a Cloud Function**
+(`onReportCreated`, triggered on `reports/{reportId}` create), using the
+Admin SDK. The client only ever writes a raw report with the limited field
+set defined in "Firestore Rules" — it cannot bypass any of this by calling
+the Firestore API directly, since the trusted logic runs on report
+creation regardless of which client (or non-client) created it.
+
+- **Duplicate / spam prevention (server-enforced):** the function checks if
+  the same `UserId` already has a report for the same `LocationId` +
+  `Category` created within the last **5 minutes**. If so, it deletes the
+  just-created report (or marks it rejected) and does not touch any
+  incident. Because this check runs in the function, not the client, it
+  cannot be bypassed by calling the Firestore SDK/REST API directly — this
+  closes the spam gap the client-only check had.
   (Earlier drafts used `UserId + LocationId + Category + CreatedAt` as a
   uniqueness key — that's a no-op, since `CreatedAt` is a high-precision
   timestamp that's effectively always unique. The 5-minute window above is
-  the actual rule to implement.)
-- Never delete existing report data.
-- **Atomicity:** creating a report and updating/creating its matching
-  incident MUST happen inside a single Firestore `runTransaction` (or a
-  Cloud Function triggered on report creation). Doing the "read incident →
-  decide → write" sequence as separate client calls risks a lost update when
-  two users report the same `LocationId` + `Category` at nearly the same
-  time (both read `ReportCount = 2`, both write back `3`).
-- When a new report is created (inside the transaction above), check if an
-  active incident exists for the same `LocationId` + `Category` within the
-  last 24 hours.
-- If an active incident exists, increment `ReportCount` and update
-  `LastUpdatedAt`.
-- If no active incident exists, create a new incident.
-- Update incident `Severity` based on `ReportCount`:
-  - 1-2 reports → `Warning`
-  - 3+ reports → `Critical`
-- An incident is automatically marked `Resolved` if no new reports are added
-  within 24 hours. For MVP this is checked client-side on app open (cheap,
-  no extra cost, but an incident can stay stale `Active` if nobody opens the
-  app for a while). If/when the project moves to the Blaze (pay-as-you-go)
-  plan, replace this with a **Cloud Scheduled Function** running e.g. hourly
-  for reliability — flagged here as a known MVP limitation, not a bug.
+  the actual rule.)
+- Never delete existing report data (the spam-rejection case above is the
+  one narrow exception, and only for reports the function itself just
+  rejected within the same invocation).
+- **Atomicity:** the function looks up or creates the matching incident and
+  writes the report's `IncidentId`/`Status` inside a single Firestore
+  `runTransaction` on the server. Because the Cloud Function is the only
+  writer of `incidents`, there's no client-vs-client race to account for —
+  only concurrent function invocations, which the transaction still
+  protects against.
+- Look up an active incident for the same `LocationId` + `Category` within
+  the last 24 hours.
+  - If found: increment `ReportCount`, update `LastUpdatedAt`, recompute
+    `Severity` (see "Severity Scoring" — `ReportCount × CategoryUrgencyWeight`,
+    NOT `ReportCount` alone), set `report.IncidentId` + `report.Status`.
+  - If not found: create a new incident (`ReportCount = 1`, `Severity`
+    computed the same way, `Status = "Active"`), set `report.IncidentId` +
+    `report.Status = "Active"`.
+- **Auto-resolve (reliable, server-side):** a **Cloud Scheduled Function**
+  runs hourly (independent of whether any user has the app open), finds
+  incidents where `LastUpdatedAt < now - 24 hours`, and resolves them. Each
+  incident's report batch-update uses Firestore `WriteBatch`, chunked into
+  groups of ≤500 (Firestore's per-batch limit) so an incident with many
+  linked reports still resolves atomically per chunk instead of silently
+  failing past the limit. This replaces the earlier "checked on app open"
+  approach, which depended on a random user's device and phone connectivity
+  to run consistency-critical work — the scheduled function runs regardless
+  of client activity.
 - **Report ↔ Incident status relationship:** an individual `Report.Status`
-  is NOT set independently by the user. It mirrors its parent incident's
-  status: a report is `Active` while its `IncidentId` points to an `Active`
-  incident, and flips to `Resolved` the moment that incident resolves (batch
-  update as part of the same resolve operation). This keeps the two statuses
-  from silently drifting apart.
+  is never set by the user. It mirrors its parent incident's status: a
+  report is `Active` while its `IncidentId` points to an `Active` incident,
+  and flips to `Resolved` the moment that incident resolves (as part of the
+  same scheduled-function batch above).
 - Locations are pre-seeded for MVP. No user-created locations in version 1.
 
 ---
@@ -331,8 +404,8 @@ users/{userId}/profile.jpg:
 - Display a map of campus with markers for each location.
 - Each marker shows the current severity:
   - 🟢 Normal (no active incident)
-  - 🟡 Warning (1-2 reports)
-  - 🔴 Critical (3+ reports)
+  - 🟡 Warning (score 1-2, see "Severity Scoring")
+  - 🔴 Critical (score 3+, see "Severity Scoring" — can trigger from a single report of a high-weight category)
 - Tap a marker to navigate to Location Detail.
 - Map uses OpenStreetMap via `flutter_map` (free, no API key required).
 - Campus coordinates and zoom level are pre-configured.
@@ -390,11 +463,17 @@ users/{userId}/profile.jpg:
   - Description is required and minimum 10 characters.
 - On submit:
   - Upload photo to Firebase Cloud Storage if provided.
-  - Create report document in Firestore.
-  - Check for existing active incident (same LocationId + Category + within 24 hours).
-  - If found, update incident (increment ReportCount, update LastUpdatedAt, recalculate Severity).
-  - If not found, create new incident.
-  - Navigate to Report Confirmation screen.
+  - Create report document in Firestore with client-writable fields only
+    (see "Firestore Rules" — client does NOT set `IncidentId` or `Status`).
+  - The `onReportCreated` Cloud Function takes over from here: duplicate
+    check, incident lookup/creation, severity scoring, and writing back
+    `report.IncidentId` + `report.Status` (see "Database Rules"). The client
+    does not perform any of this itself.
+  - UI listens for the report document's `IncidentId` field to populate
+    (via Firestore snapshot listener) before navigating, so the confirmation
+    screen can show the resolved incident state rather than guessing it.
+  - Navigate to Report Confirmation screen once `IncidentId` is set (or after
+    a short timeout, showing "diproses" state if the function is still running).
 
 ### 7. Report Confirmation
 
@@ -505,7 +584,20 @@ Floating Action Button (FAB):
 
 ## Folder Structure
 
+Project root now has two deployable units: the Flutter app (`lib/`) and the
+Cloud Functions backend (`functions/`), since business logic moved server-side.
+
 ```text
+functions/
+├── src/
+│   ├── index.ts                  (exports all functions)
+│   ├── onReportCreated.ts        (incident grouping + severity scoring)
+│   ├── resolveStaleIncidents.ts  (scheduled, hourly)
+│   ├── severityScoring.ts        (CategoryUrgencyWeight table + formula)
+│   └── config.ts
+├── package.json
+└── tsconfig.json
+
 lib/
 ├── main.dart
 ├── app.dart
@@ -638,20 +730,24 @@ searchResultsProvider     → Filtered incidents based on query
 
 ---
 
-## Incident Grouping Logic (MVP)
+## Incident Grouping Logic (Cloud Function: `onReportCreated`)
 
-Steps 1-3 below MUST run inside a single Firestore `runTransaction` (see
-"Database Rules" — atomicity note) so the read-check-write sequence is safe
-under concurrent submissions.
+This entire flow runs server-side, triggered automatically whenever a
+`reports/{reportId}` document is created — by the app or by anyone calling
+Firestore directly, since the trigger doesn't care who wrote it. Steps 1-3
+run inside a single Firestore `runTransaction` on the server so concurrent
+function invocations (e.g. two reports landing at nearly the same instant)
+don't lose an increment.
 
 ```text
-When a new report is created (inside one transaction):
+onReportCreated(report):
 
-0. Duplicate check: if this user already has a report for the same
-   LocationId + Category created within the last 5 minutes, abort and
-   surface the "already reported" warning instead of continuing.
+0. Duplicate/spam check (server-side, cannot be bypassed by calling the
+   Firestore API directly): if this UserId already has another report for
+   the same LocationId + Category created within the last 5 minutes,
+   delete this report and stop — no incident is touched.
 
-1. Query Firestore for existing incident where:
+1. [inside a transaction] Query for existing incident where:
    - LocationId == report.LocationId
    - Category == report.Category
    - Status == "Active"
@@ -660,31 +756,42 @@ When a new report is created (inside one transaction):
 2. If found:
    - Increment ReportCount by exactly 1
    - Update LastUpdatedAt to now
-   - Recalculate Severity:
-     - ReportCount 1-2 → "Warning"
-     - ReportCount 3+  → "Critical"
+   - weight = CategoryUrgencyWeight(report.Category)  // see "Severity Scoring"
+   - score = ReportCount * weight
+   - Severity = score >= 3 ? "Critical" : "Warning"
    - Set report.IncidentId = incident.Id
-   - Set report.Status = incident.Status ("Active")
+   - Set report.Status = "Active"
 
 3. If not found:
+   - weight = CategoryUrgencyWeight(report.Category)
+   - Severity = weight >= 3 ? "Critical" : "Warning"   // 1 report already
+                                                         // hits Critical for
+                                                         // high-weight categories
    - Create new Incident:
      - LocationId = report.LocationId
      - Category = report.Category
      - ReportCount = 1
      - Status = "Active"
-     - Severity = "Warning"
+     - Severity = Severity (as computed above)
      - FirstReportedAt = now
      - LastUpdatedAt = now
    - Set report.IncidentId = newIncident.Id
    - Set report.Status = "Active"
+```
 
-4. Auto-resolve logic (checked on app open for MVP; move to a Cloud
-   Scheduled Function once on the Blaze plan — see "Database Rules"):
-   - If incident.LastUpdatedAt < (now - 24 hours):
-     - Set incident.Status = "Resolved"
-     - Batch-update every report where report.IncidentId == incident.Id
-       to report.Status = "Resolved" (keeps report and incident status
-       from drifting apart)
+```text
+resolveStaleIncidents() — Cloud Scheduled Function, runs hourly:
+
+1. Query incidents where Status == "Active" AND LastUpdatedAt < (now - 24h).
+2. For each stale incident:
+   - Set incident.Status = "Resolved"
+   - Query all reports where IncidentId == incident.Id
+   - Update their Status to "Resolved" using WriteBatch, chunked into
+     groups of <= 500 (Firestore's per-batch limit), so large incidents
+     still resolve atomically per chunk instead of hitting the limit
+     mid-operation.
+   - Runs independently of any user having the app open, so it can't be
+     left stuck the way a client-triggered version could be.
 ```
 
 ---
@@ -715,7 +822,7 @@ users/
 | Firestore read fails                                              | Show error message with retry button.                                  |
 | Photo upload fails                                                | Show error snackbar. Allow retry or skip photo.                        |
 | Auth session expired                                              | Redirect to Login Screen.                                              |
-| Duplicate report (same user, location, category within 5 minutes) | Show warning: "Anda baru saja melaporkan masalah ini."                 |
+| Duplicate report (same user, location, category within 5 minutes) — now rejected server-side by the Cloud Function, not just checked client-side | Show warning: "Anda baru saja melaporkan masalah ini." |
 | Empty location list                                               | Show empty state: "Belum ada lokasi terdaftar."                        |
 | Empty incident list                                               | Show empty state: "Tidak ada masalah yang dilaporkan. Kampus aman! 👻" |
 
@@ -758,18 +865,26 @@ Each location should have latitude and longitude coordinates for the campus map.
 ## Deliverables
 
 - Complete Flutter application source code.
+- **Cloud Functions source code** (`functions/`): `onReportCreated`,
+  `resolveStaleIncidents`, and the severity-scoring module, deployable via
+  `firebase deploy --only functions`.
 - Firebase configuration files.
-- Firestore security rules.
+- Firestore security rules (client has no direct write access to `incidents`
+  — see "Firestore Rules").
 - Pre-seeded location data (Firestore seed script or manual setup guide).
 - `README.md` with:
   - Installation steps
-  - Firebase setup guide
+  - Firebase setup guide, **including enabling the Blaze plan and deploying
+    Cloud Functions** (functions won't run on the free Spark plan)
   - How to run the application
   - How to seed data
   - Project structure overview
 - Architecture.md (this document).
-- Ensure the application builds successfully.
-- All basic features working: authentication, campus map, live status, create report, incident grouping, report history, search and filter.
+- Ensure the application builds successfully and Cloud Functions deploy
+  without errors.
+- All basic features working: authentication, campus map, live status,
+  create report (server-processed), incident grouping, report history,
+  search and filter.
 
 ---
 
