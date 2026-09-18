@@ -14,7 +14,7 @@ Help students monitor and report real-time facility conditions on campus. The ap
 - Authentication: Firebase Auth (Email/Password + Google Sign-In)
 - Storage: Firebase Cloud Storage
 - State Management: Riverpod
-- Maps: flutter_map + OpenStreetMap (or google_maps_flutter)
+- Maps: `flutter_map` + OpenStreetMap tiles (final choice for v1 — no API key/billing required; revisit `google_maps_flutter` only if OSM tile quality becomes an issue post-MVP)
 - Minimum Android SDK: 21 (Android 5.0)
 - IDE: Android Studio / VS Code
 
@@ -178,6 +178,29 @@ incidents/
 
 ---
 
+## Required Composite Indexes
+
+The incident-lookup query in "Database Rules" filters `incidents` by
+`LocationId` + `Category` + `Status`, and orders/filters by `LastUpdatedAt`
+(range: last 24 hours). Firestore will reject this combination until a
+matching composite index exists — create it up front instead of discovering
+it via a runtime error:
+
+```text
+Collection: incidents
+Fields indexed: LocationId (Asc), Category (Asc), Status (Asc), LastUpdatedAt (Desc)
+```
+
+A second index is needed for `userReportsProvider` (reports filtered by
+`UserId`, ordered by `CreatedAt` descending):
+
+```text
+Collection: reports
+Fields indexed: UserId (Asc), CreatedAt (Desc)
+```
+
+---
+
 ## Firestore Rules
 
 ```text
@@ -194,28 +217,100 @@ locations:
 reports:
   - All authenticated users can read.
   - Authenticated user can create report (UserId must match auth UID).
-  - Only the report owner can update their own report.
+  - Report owner can update ONLY the `IncidentId` field of their own report
+    (set right after creation, once the matching incident is resolved/created).
+  - Report `Status` is NOT user-writable from the client — it is derived from
+    its parent incident's status (see "Database Rules"), so it can only be
+    changed by whichever process is trusted to write incidents (see below).
   - Reports cannot be deleted (data integrity).
 
 incidents:
   - All authenticated users can read.
-  - Incidents are created and updated via application logic (Cloud Functions or client-side).
+  - No arbitrary authenticated user may freely write any field. Client-side
+    writes are restricted by rule to only:
+      - increment `ReportCount` by exactly 1 per write,
+      - update `LastUpdatedAt` to `request.time`,
+      - recompute `Severity` deterministically from the new `ReportCount`
+        (rule validates the new value matches the 1-2 → Warning, 3+ → Critical
+        mapping — client cannot set an arbitrary severity),
+      - create a new incident document with `ReportCount == 1`.
+  - `Status` transitions to `Resolved` are only allowed via the trusted
+    auto-resolve path (Cloud Function), never a direct client write, so a user
+    cannot mark someone else's incident resolved early.
   - Users cannot directly delete incidents.
+
+NOTE: Firestore security rules can validate individual field-level writes
+(old vs. new values) but cannot safely guarantee atomicity across a
+read-then-write increment. The rule above limits *what* a client is allowed
+to write; the transaction requirement below (see "Database Rules") ensures
+*how* it's written so two simultaneous reports don't lose an increment.
+```
+
+---
+
+## Firebase Storage Rules
+
+Storage rules were missing from earlier drafts — without them the bucket
+falls back to fully open or fully locked depending on initial console setup,
+neither of which is correct here.
+
+```text
+reports/{reportId}/photo.jpg:
+  - Read: any authenticated user (report photos are visible to all, same as
+    the report document itself).
+  - Write: only the authenticated user whose UID matches the `UserId` on the
+    corresponding `reports/{reportId}` Firestore document, enforced via a
+    `firestore.get()` check inside the storage rule.
+  - Max file size: 5 MB (reject larger uploads at the rule level, not just
+    client-side).
+  - Allowed content type: image/* only.
+
+users/{userId}/profile.jpg:
+  - Read: any authenticated user (profile photos are not sensitive here).
+  - Write: only if `request.auth.uid == userId`.
+  - Max file size: 5 MB, image/* only.
 ```
 
 ---
 
 ## Database Rules
 
-- A Report is unique by combination of `UserId`, `LocationId`, `Category`, and `CreatedAt` (prevent exact duplicate submissions).
+- **Duplicate prevention:** before creating a report, check if the same user
+  already submitted a report for the same `LocationId` + `Category` within
+  the last **5 minutes**. If so, block submission and show the warning in
+  "Error Handling" instead of creating the report.
+  (Earlier drafts used `UserId + LocationId + Category + CreatedAt` as a
+  uniqueness key — that's a no-op, since `CreatedAt` is a high-precision
+  timestamp that's effectively always unique. The 5-minute window above is
+  the actual rule to implement.)
 - Never delete existing report data.
-- When a new report is created, check if an active incident exists for the same `LocationId` + `Category` within the last 24 hours.
-- If an active incident exists, increment `ReportCount` and update `LastUpdatedAt`.
+- **Atomicity:** creating a report and updating/creating its matching
+  incident MUST happen inside a single Firestore `runTransaction` (or a
+  Cloud Function triggered on report creation). Doing the "read incident →
+  decide → write" sequence as separate client calls risks a lost update when
+  two users report the same `LocationId` + `Category` at nearly the same
+  time (both read `ReportCount = 2`, both write back `3`).
+- When a new report is created (inside the transaction above), check if an
+  active incident exists for the same `LocationId` + `Category` within the
+  last 24 hours.
+- If an active incident exists, increment `ReportCount` and update
+  `LastUpdatedAt`.
 - If no active incident exists, create a new incident.
 - Update incident `Severity` based on `ReportCount`:
   - 1-2 reports → `Warning`
   - 3+ reports → `Critical`
-- An incident is automatically marked `Resolved` if no new reports are added within 24 hours (handled by app logic or scheduled function).
+- An incident is automatically marked `Resolved` if no new reports are added
+  within 24 hours. For MVP this is checked client-side on app open (cheap,
+  no extra cost, but an incident can stay stale `Active` if nobody opens the
+  app for a while). If/when the project moves to the Blaze (pay-as-you-go)
+  plan, replace this with a **Cloud Scheduled Function** running e.g. hourly
+  for reliability — flagged here as a known MVP limitation, not a bug.
+- **Report ↔ Incident status relationship:** an individual `Report.Status`
+  is NOT set independently by the user. It mirrors its parent incident's
+  status: a report is `Active` while its `IncidentId` points to an `Active`
+  incident, and flips to `Resolved` the moment that incident resolves (batch
+  update as part of the same resolve operation). This keeps the two statuses
+  from silently drifting apart.
 - Locations are pre-seeded for MVP. No user-created locations in version 1.
 
 ---
@@ -545,8 +640,16 @@ searchResultsProvider     → Filtered incidents based on query
 
 ## Incident Grouping Logic (MVP)
 
+Steps 1-3 below MUST run inside a single Firestore `runTransaction` (see
+"Database Rules" — atomicity note) so the read-check-write sequence is safe
+under concurrent submissions.
+
 ```text
-When a new report is created:
+When a new report is created (inside one transaction):
+
+0. Duplicate check: if this user already has a report for the same
+   LocationId + Category created within the last 5 minutes, abort and
+   surface the "already reported" warning instead of continuing.
 
 1. Query Firestore for existing incident where:
    - LocationId == report.LocationId
@@ -555,12 +658,13 @@ When a new report is created:
    - LastUpdatedAt > (now - 24 hours)
 
 2. If found:
-   - Increment ReportCount
+   - Increment ReportCount by exactly 1
    - Update LastUpdatedAt to now
    - Recalculate Severity:
      - ReportCount 1-2 → "Warning"
      - ReportCount 3+  → "Critical"
    - Set report.IncidentId = incident.Id
+   - Set report.Status = incident.Status ("Active")
 
 3. If not found:
    - Create new Incident:
@@ -572,10 +676,15 @@ When a new report is created:
      - FirstReportedAt = now
      - LastUpdatedAt = now
    - Set report.IncidentId = newIncident.Id
+   - Set report.Status = "Active"
 
-4. Auto-resolve logic (checked on app open or periodic):
+4. Auto-resolve logic (checked on app open for MVP; move to a Cloud
+   Scheduled Function once on the Blaze plan — see "Database Rules"):
    - If incident.LastUpdatedAt < (now - 24 hours):
      - Set incident.Status = "Resolved"
+     - Batch-update every report where report.IncidentId == incident.Id
+       to report.Status = "Resolved" (keeps report and incident status
+       from drifting apart)
 ```
 
 ---
