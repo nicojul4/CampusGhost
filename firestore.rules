@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /locations/{locationId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'UserId', 'LocationId', 'Category', 'Description', 'PhotoUrl'
+        ])
+        && request.resource.data.keys().hasAll([
+          'UserId', 'LocationId', 'Category', 'Description'
+        ])
+        && request.resource.data.UserId == request.auth.uid
+        && request.resource.data.LocationId is string
+        && request.resource.data.Category is string
+        && request.resource.data.Description is string
+        && (request.resource.data.Category == 'Wifi'
+          || ('PhotoUrl' in request.resource.data
+            && request.resource.data.PhotoUrl is string))
+        && (!('PhotoUrl' in request.resource.data)
+          || request.resource.data.PhotoUrl is string);
+      allow update, delete: if false;
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}

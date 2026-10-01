@@ -1,6 +1,6 @@
+import '../repositories/auth_repository.dart';
 import '../models/user_model.dart';
 
-/// Autentikasi lokal untuk kebutuhan prototype, tanpa server.
 class AuthService {
   const AuthService();
 
@@ -8,10 +8,35 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 350));
-    if (email.trim().isEmpty || password.isEmpty) return null;
-    return UserModel.demo;
+    final user = await AuthRepository().signIn(
+      email: email.trim(),
+      password: password,
+    );
+    return UserModel(
+      name: user.displayName ?? user.email?.split('@').first ?? 'Mahasiswa',
+      email: user.email ?? email,
+      studentId: '',
+      program: 'Mahasiswa',
+    );
   }
 
-  Future<void> signOut() async {}
+  Future<UserModel> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final user = await AuthRepository().register(
+      name: name,
+      email: email,
+      password: password,
+    );
+    return UserModel(
+      name: name.trim(),
+      email: user.email ?? email.trim(),
+      studentId: '',
+      program: 'Mahasiswa',
+    );
+  }
+
+  Future<void> signOut() => AuthRepository().signOut();
 }

@@ -190,7 +190,7 @@ Data minimal:
 Lokasi
 Kategori masalah
 Deskripsi
-Foto (opsional)
+Foto bukti wajib kecuali kategori Wi-Fi (maksimal 1 MB per foto)
 Waktu laporan
 ```
 
@@ -508,6 +508,20 @@ geolocator                          → Lokasi pengguna (opsional)
 
 ## Backend — Firebase (Google)
 
+### Mode prototipe tanpa Blaze
+
+Untuk penggunaan lokal saat ini, Firebase hanya menangani autentikasi akun.
+Nama tampilan akun tersimpan pada Firebase Auth; foto profil disimpan terenkripsi
+secara lokal per akun dengan batas 1 MB. Lokasi disediakan oleh aplikasi dan
+laporan disimpan terenkripsi di secure storage pada perangkat, terpisah per akun.
+Foto bukti maksimal 1 MB per file
+dan 3 MB total per akun; wajib untuk semua kategori selain Wi-Fi. Data laporan
+tidak tersinkron ke mahasiswa lain. Agregasi incident dan pencegahan duplikat berjalan di client,
+sehingga pemilik perangkat masih dapat mengubah data lokal. Mode ini cocok
+untuk demonstrasi satu akun/perangkat, bukan sumber data resmi kampus. Mode
+backend Firebase bersama yang dijelaskan di bawah membutuhkan Blaze untuk
+Cloud Functions.
+
 Campus Ghost menggunakan **Firebase** sebagai backend utama.
 
 ### Alasan Pemilihan Firebase
@@ -518,7 +532,7 @@ Campus Ghost menggunakan **Firebase** sebagai backend utama.
 | **Tanpa server management** | Firebase adalah Backend-as-a-Service (BaaS), tidak perlu setup dan maintain server sendiri.    |
 | **Autentikasi mudah**       | Firebase Auth mendukung email/password dan Google Sign-In.                                     |
 | **Cloud Storage**           | Untuk menyimpan foto laporan dari pengguna.                                                    |
-| **Free tier cukup**         | Spark plan (gratis) sudah cukup untuk skala MVP dan demonstrasi.                               |
+| **Backend berbayar sesuai kebutuhan** | Blaze diperlukan untuk Cloud Functions; penggunaan MVP tetap perlu dipantau.                    |
 | **Integrasi Flutter**       | FlutterFire menyediakan plugin resmi dengan dokumentasi lengkap.                               |
 | **Cepat di-setup**          | Cocok untuk timeline 12 pertemuan — tidak perlu banyak waktu untuk konfigurasi backend.        |
 
@@ -624,6 +638,7 @@ Pertemuan 5+     → Iterasi dan perbaikan UI berdasarkan progress
 7. Report Confirmation  → Konfirmasi laporan berhasil
 8. My Reports           → Riwayat laporan pengguna
 9. Search & Filter      → Pencarian dan filter masalah
+10. Edit Profile        → Ubah nama tampilan dan foto profil
 ```
 
 ---

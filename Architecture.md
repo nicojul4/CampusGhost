@@ -38,6 +38,34 @@ Help students monitor and report real-time facility conditions on campus. The ap
 
 ## Backend Architecture Decision
 
+### Mode prototipe lokal untuk batas biaya
+
+Atas keputusan pemilik proyek, prototipe saat ini menjalankan laporan dan
+incident secara lokal agar tidak membutuhkan Blaze:
+
+- Firebase Auth tetap dipakai untuk pendaftaran dan masuk akun. Profil tidak
+  ditulis ke Firestore. Nama tampilan diperbarui pada akun Firebase Auth,
+  sedangkan foto profil disimpan terenkripsi secara lokal per UID dengan batas
+  1 MB.
+- Daftar lokasi disertakan di aplikasi.
+- Repository menyimpan laporan terenkripsi dengan secure storage perangkat,
+  dipisahkan berdasarkan Firebase Auth UID. Bukti foto disimpan bersama
+  laporan; ukurannya dibatasi 1 MB per foto dan 3 MB total per akun. Foto wajib
+  untuk kategori selain `Wifi`, sedangkan untuk `Wifi` bersifat opsional.
+  Agregasi incident, severity, penolakan duplikat lima menit, dan penyelesaian
+  setelah 24 jam dihitung di client.
+- Data hanya tersedia pada perangkat/browser dan akun yang menyimpannya.
+  Mahasiswa lain tidak menerima laporan tersebut. Pemilik perangkat masih
+  dapat memanipulasi data lokal; karena itu validasi client bukan kontrol
+  keamanan server dan hasilnya tidak boleh dianggap sebagai data kampus resmi.
+- Penyimpanan web menggunakan implementasi WebCrypto yang masih eksperimental
+  dan harus dijalankan pada localhost atau HTTPS.
+
+Mode lokal ini adalah pengecualian prototipe karena batas biaya. Mode backend
+bersama di bawah tetap menjadi rancangan produksi dan memerlukan Blaze untuk
+Cloud Functions. Jangan menganggap mode lokal memenuhi jaminan server-side
+untuk anti-spam, integritas incident, atau sinkronisasi real-time.
+
 Earlier drafts of this document kept all incident-grouping, severity, and
 auto-resolve logic on the client to avoid the cost of Firebase's Blaze
 (pay-as-you-go) plan. Review feedback surfaced three concrete problems with
@@ -103,7 +131,7 @@ decision before scaling beyond a pilot.
 | LocationId  | String    | ID lokasi fasilitas                                           |
 | Category    | String    | Kategori masalah (enum)                                       |
 | Description | String    | Deskripsi masalah                                             |
-| PhotoUrl    | String?   | URL foto laporan (opsional)                                   |
+| PhotoUrl    | String?   | Bukti foto; wajib kecuali kategori `Wifi`                     |
 | Status      | String    | Status laporan: `Active`, `Resolved`                          |
 | IncidentId  | String?   | ID incident terkait (diisi Cloud Function saat report masuk, bukan client) |
 | CreatedAt   | Timestamp | Waktu laporan dibuat (server timestamp)                       |
@@ -285,8 +313,9 @@ reports:
   - All authenticated users can read.
   - Authenticated user can create a report with ONLY these client-writable
     fields: `UserId` (must match auth UID), `LocationId`, `Category`,
-    `Description`, `PhotoUrl`. The client must NOT set `IncidentId`,
-    `Status`, or `CreatedAt` — the rule rejects a create request that
+    `Description`, `PhotoUrl`. `PhotoUrl` is required except when Category is
+    `Wifi`. Firestore Rules enforce this conditional requirement. The client
+    must NOT set `IncidentId`, `Status`, or `CreatedAt` — the rule rejects a create request that
     includes them (they default to `null` / `"Active"` / server timestamp).
   - `IncidentId`, `Status`, and `UpdatedAt` are written ONLY by the Cloud
     Function (via Admin SDK, which bypasses these rules entirely) after it
@@ -398,6 +427,8 @@ creation regardless of which client (or non-client) created it.
 - Auto-login if session is still valid.
 - Logout.
 - Store user profile in Firestore `users` collection after first login.
+- Allow editing the display name and profile photo. Keep the account email
+  read-only in the profile editor.
 
 ### 2. Campus Map
 
@@ -456,11 +487,14 @@ creation regardless of which client (or non-client) created it.
   - Location (dropdown or search, pre-filled if navigated from Location Detail)
   - Category (dropdown with icons)
   - Description (text area, required, min 10 characters)
-  - Photo (camera or gallery, optional)
+  - Photo or screenshot (required except for `Wifi`; optional for `Wifi`)
 - Validation:
   - Location is required.
   - Category is required.
   - Description is required and minimum 10 characters.
+  - Photo evidence is required for every category except `Wifi`.
+  - Accepted formats: JPG, PNG, and WebP; local prototype limit: 1 MB per
+    photo and 3 MB total evidence per account.
 - On submit:
   - Upload photo to Firebase Cloud Storage if provided.
   - Create report document in Firestore with client-writable fields only
@@ -526,7 +560,8 @@ creation regardless of which client (or non-client) created it.
 9.  Report Confirmation     → Success confirmation
 10. My Reports Screen       → Report history
 11. Search Screen           → Search and filter incidents
-12. Profile Screen          → User profile and logout
+12. Profile Screen          → User profile, edit profile, and logout
+13. Edit Profile Screen     → Update display name and profile photo
 ```
 
 ---
@@ -820,7 +855,7 @@ users/
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | No internet connection                                            | Show offline banner. Use Firestore offline persistence.                |
 | Firestore read fails                                              | Show error message with retry button.                                  |
-| Photo upload fails                                                | Show error snackbar. Allow retry or skip photo.                        |
+| Photo upload fails                                                | Show error snackbar and allow retry; skip only for WiFi reports.       |
 | Auth session expired                                              | Redirect to Login Screen.                                              |
 | Duplicate report (same user, location, category within 5 minutes) — now rejected server-side by the Cloud Function, not just checked client-side | Show warning: "Anda baru saja melaporkan masalah ini." |
 | Empty location list                                               | Show empty state: "Belum ada lokasi terdaftar."                        |
