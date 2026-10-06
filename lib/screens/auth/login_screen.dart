@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         Icon(Icons.school_rounded,
                                             color: campusOrange, size: 19),
                                         SizedBox(width: 7),
-                                        Text('PRADITA ACCESS HUB',
+                                        Text('PRADITA UNIVERSITY PORTAL',
                                             style: TextStyle(
                                                 color: campusGreen,
                                                 fontWeight: FontWeight.w800,
@@ -346,14 +346,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ]),
                         const SizedBox(height: 15),
-                        const Text('📍  Scientia Business Park, Gading Serpong',
+                        const Text('Scientia Business Park, Gading Serpong',
                             style: TextStyle(
                                 color: campusGreen,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
                         Text(
-                            'Layanan Sarpras Pradita  •  Bantuan Teknis ICT  •  Kebijakan Privasi',
+                            'Layanan Pradita University  •  Bantuan Teknis Pradita  •  Kebijakan Privasi',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 color: Theme.of(context)

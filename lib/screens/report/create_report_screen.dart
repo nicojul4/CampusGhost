@@ -26,7 +26,6 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
   ReportCategory? _category;
   Uint8List? _photoBytes;
   String? _photoMimeType;
-  bool _submitting = false;
   bool _initialArgumentsHandled = false;
 
   @override
@@ -115,10 +114,12 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
       ));
       return;
     }
-    if (!_formKey.currentState!.validate() || _submitting) return;
-    setState(() => _submitting = true);
+    if (!_formKey.currentState!.validate() ||
+        ref.read(reportSubmissionProvider).isLoading) {
+      return;
+    }
     try {
-      final result = await ref.read(reportRepositoryProvider).submitReport(
+      final result = await ref.read(reportSubmissionProvider.notifier).submit(
             locationId: _locationId!,
             category: _category!.value,
             description: _description.text.trim(),
@@ -127,7 +128,6 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                 : encodeReportPhoto(_photoBytes!, _photoMimeType!),
           );
       if (!mounted) return;
-      setState(() => _submitting = false);
       final message = switch (result.state) {
         ReportSubmissionState.duplicate =>
           'Anda baru saja melaporkan masalah ini.',
@@ -178,19 +178,28 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Laporan gagal disimpan. Silakan coba kembali.')));
       }
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
+    } finally {}
   }
 
   @override
   Widget build(BuildContext context) {
     final locations = ref.watch(locationsProvider);
+    final submission = ref.watch(reportSubmissionProvider);
+    final isSubmitting = submission.isLoading;
     return Scaffold(
       appBar: AppBar(title: const Text('Buat laporan')),
       body: locations.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Lokasi gagal dimuat.')),
+        error: (_, __) => Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Lokasi gagal dimuat.'),
+            TextButton.icon(
+              onPressed: () => ref.invalidate(locationsProvider),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Coba lagi'),
+            ),
+          ]),
+        ),
         data: (items) {
           if (items.isEmpty) {
             return const Center(child: Text('Belum ada lokasi terdaftar.'));
@@ -316,7 +325,7 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                 ),
                 const SizedBox(height: 9),
                 OutlinedButton.icon(
-                  onPressed: _submitting ? null : _pickPhoto,
+                  onPressed: isSubmitting ? null : _pickPhoto,
                   icon: const Icon(Icons.add_a_photo_outlined),
                   label: Text(_photoBytes == null
                       ? 'Pilih foto atau screenshot'
@@ -343,11 +352,11 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                 ],
                 const SizedBox(height: 18),
                 PrimaryButton(
-                  onPressed: _submitting ? null : _submit,
-                  isLoading: _submitting,
+                  onPressed: isSubmitting ? null : _submit,
+                  isLoading: isSubmitting,
                   icon: Icons.send_rounded,
                   label:
-                      _submitting ? 'Mengirim...' : 'Kirim Laporan Fasilitas',
+                      isSubmitting ? 'Mengirim...' : 'Kirim Laporan Fasilitas',
                 ),
               ],
             ),

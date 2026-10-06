@@ -94,7 +94,11 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 10),
           reports.when(
             loading: () => const LinearProgressIndicator(),
-            error: (_, __) => const Text('Ringkasan gagal dimuat.'),
+            error: (_, __) => TextButton.icon(
+              onPressed: () => ref.invalidate(userReportsProvider),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Ringkasan gagal dimuat. Coba lagi'),
+            ),
             data: (items) => Row(children: [
               Expanded(
                   child: _ContributionTile(
@@ -122,7 +126,16 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           reports.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Text('Riwayat laporan gagal dimuat.'),
+            error: (_, __) => Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('Riwayat laporan gagal dimuat.'),
+                TextButton.icon(
+                  onPressed: () => ref.invalidate(userReportsProvider),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Coba lagi'),
+                ),
+              ]),
+            ),
             data: (items) => items.isEmpty
                 ? Text('Belum ada laporan yang dibuat.',
                     style: TextStyle(color: colors.onSurfaceVariant))
