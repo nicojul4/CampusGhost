@@ -6,7 +6,9 @@ import 'report_provider.dart';
 
 final incidentRepositoryProvider = Provider<IncidentRepository>(
     (ref) => IncidentRepository(ref.watch(reportRepositoryProvider)));
-final incidentsProvider = StreamProvider<List<IncidentModel>>(
-    (ref) => ref.watch(incidentRepositoryProvider).watchActive());
+final incidentsProvider = StreamProvider<List<IncidentModel>>((ref) {
+  ref.watch(activeUserIdProvider);
+  return ref.watch(incidentRepositoryProvider).watchActive();
+});
 final incidentDetailProvider = StreamProvider.family<IncidentModel?, String>(
     (ref, id) => ref.watch(incidentRepositoryProvider).watchById(id));

@@ -1,10 +1,13 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/routes.dart';
+import '../../enums/report_status.dart';
+import '../../models/report_model.dart';
 import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/firebase_provider.dart';
+import '../../providers/incident_provider.dart';
 import '../../services/report_photo_codec.dart';
 import '../../providers/report_provider.dart';
 import '../../widgets/campus_ui.dart';
@@ -14,18 +17,94 @@ import '../../widgets/theme_mode_scope.dart';
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  Future<void> _logout(BuildContext context) async {
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
     await const AuthService().signOut();
+    ref.invalidate(reportsProvider);
+    ref.invalidate(userReportsProvider);
+    ref.invalidate(incidentsProvider);
+    ref.invalidate(profilePhotoProvider);
+    ref.invalidate(authStateProvider);
     if (context.mounted) {
       Navigator.pushNamedAndRemoveUntil(
           context, AppRoutes.login, (route) => false);
     }
   }
 
+  Future<void> _editReport(
+    BuildContext context,
+    WidgetRef ref,
+    ReportModel report,
+  ) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (_) => _EditReportDialog(
+        report: report,
+        onSave: (description, status) =>
+            ref.read(reportRepositoryProvider).updateReport(
+                  reportId: report.id,
+                  description: description,
+                  status: status,
+                ),
+      ),
+    );
+
+    if (updated == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Laporan ${report.category} berhasil diperbarui.'),
+      ));
+    }
+  }
+
+  Future<void> _deleteReport(
+    BuildContext context,
+    WidgetRef ref,
+    ReportModel report,
+  ) async {
+    final colors = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.warning_amber_rounded, color: colors.error, size: 36),
+        title: const Text('Hapus Laporan?'),
+        content: Text(
+          'Laporan "${report.category}" di ${report.locationId} akan dihapus secara permanen dari penyimpanan lokal perangkat.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: colors.error),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref.read(reportRepositoryProvider).deleteReport(report.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Laporan ${report.category} berhasil dihapus.'),
+        ));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gagal menghapus laporan. Silakan coba lagi.'),
+        ));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value ??
-        FirebaseAuth.instance.currentUser;
+        ref.watch(firebaseAuthProvider).currentUser;
     final profilePhoto = ref.watch(profilePhotoProvider).asData?.value;
     final reports = ref.watch(userReportsProvider);
     final colors = Theme.of(context).colorScheme;
@@ -161,6 +240,9 @@ class ProfileScreen extends ConsumerWidget {
                                 reporter: 'Laporan Anda',
                                 evidencePhoto:
                                     decodeReportPhoto(report.photoUrl),
+                                onEdit: () => _editReport(context, ref, report),
+                                onDelete: () =>
+                                    _deleteReport(context, ref, report),
                                 onTap: () {
                                   final id = report.incidentId;
                                   if (id != null) {
@@ -177,11 +259,12 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 21),
           const SectionTitle('Pengaturan'),
           const SizedBox(height: 6),
-          Container(
-            decoration: BoxDecoration(
-                color: colors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(17),
-                border: Border.all(color: colors.outline)),
+          Material(
+            color: colors.surfaceContainerLow,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(17),
+              side: BorderSide(color: colors.outline),
+            ),
             child: SwitchListTile(
               value: themeMode.isDark,
               onChanged: themeMode.onChanged,
@@ -199,7 +282,7 @@ class ProfileScreen extends ConsumerWidget {
           PrimaryButton(
             label: 'Keluar dari akun',
             icon: Icons.logout_rounded,
-            onPressed: () => _logout(context),
+            onPressed: () => _logout(context, ref),
           ),
           const SizedBox(height: 14),
           Center(
@@ -296,4 +379,141 @@ class _ProfileInfo extends StatelessWidget {
         subtitle: Text(value,
             style: const TextStyle(fontWeight: FontWeight.w600, height: 1.5)),
       );
+}
+
+class _EditReportDialog extends StatefulWidget {
+  const _EditReportDialog({required this.report, required this.onSave});
+
+  final ReportModel report;
+  final Future<void> Function(String description, ReportStatus status) onSave;
+
+  @override
+  State<_EditReportDialog> createState() => _EditReportDialogState();
+}
+
+class _EditReportDialogState extends State<_EditReportDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+  late ReportStatus _selectedStatus;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.report.description);
+    _selectedStatus = widget.report.status;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate() || _isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      await widget.onSave(_controller.text.trim(), _selectedStatus);
+      if (mounted) Navigator.pop(context, true);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gagal memperbarui laporan. Silakan coba lagi.'),
+        ));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: Row(children: [
+        Icon(Icons.edit_note_rounded, color: colors.primary),
+        const SizedBox(width: 8),
+        const Text('Edit Laporan',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+      ]),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Kategori: ${widget.report.category} • Lokasi: ${widget.report.locationId}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text('Deskripsi Kendala',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _controller,
+                maxLines: 3,
+                enabled: !_isSaving,
+                decoration: const InputDecoration(
+                  hintText: 'Jelaskan kendala fasilitas minimal 10 karakter',
+                ),
+                validator: (value) {
+                  final text = value?.trim() ?? '';
+                  if (text.length < 10) {
+                    return 'Deskripsi minimal 10 karakter.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 14),
+              const Text('Status Laporan',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              SegmentedButton<ReportStatus>(
+                segments: const [
+                  ButtonSegment(
+                    value: ReportStatus.active,
+                    label: Text('Aktif'),
+                    icon: Icon(Icons.pending_actions_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: ReportStatus.resolved,
+                    label: Text('Selesai'),
+                    icon: Icon(Icons.task_alt_rounded, size: 16),
+                  ),
+                ],
+                selected: {_selectedStatus},
+                onSelectionChanged: _isSaving
+                    ? null
+                    : (selection) =>
+                        setState(() => _selectedStatus = selection.first),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
+          child: const Text('Batal'),
+        ),
+        FilledButton.icon(
+          onPressed: _isSaving ? null : _submit,
+          icon: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
+                )
+              : const Icon(Icons.save_rounded, size: 18),
+          label: Text(_isSaving ? 'Menyimpan...' : 'Simpan'),
+        ),
+      ],
+    );
+  }
 }

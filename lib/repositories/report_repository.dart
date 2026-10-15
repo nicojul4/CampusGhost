@@ -29,15 +29,24 @@ class ReportRepository {
   final LocalCampusStore _store;
   final FirebaseAuth _auth;
 
-  Stream<List<ReportModel>> watchAll() => watchCurrentUser();
+  String _currentUserId() => _auth.currentUser?.uid ?? 'guest_user';
 
-  Stream<List<ReportModel>> watchIncident(String incidentId) async* {
-    final user = _auth.currentUser;
-    if (user == null) {
-      yield const [];
-      return;
+  Stream<List<ReportModel>> watchReportsForUser([String? targetUserId]) async* {
+    final userId = targetUserId ?? _currentUserId();
+    await for (final values in _store.watchReports(userId)) {
+      yield values.map((value) => _toModel(value, values)).toList()
+        ..sort((a, b) =>
+            (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
     }
-    await for (final values in _store.watchReports(user.uid)) {
+  }
+
+  Stream<List<ReportModel>> watchAll([String? targetUserId]) =>
+      watchCurrentUser(targetUserId);
+
+  Stream<List<ReportModel>> watchIncident(String incidentId,
+      [String? targetUserId]) async* {
+    final userId = targetUserId ?? _currentUserId();
+    await for (final values in _store.watchReports(userId)) {
       yield values
           .where((value) => value['IncidentId'] == incidentId)
           .map((value) => _toModel(value, values))
@@ -47,18 +56,8 @@ class ReportRepository {
     }
   }
 
-  Stream<List<ReportModel>> watchCurrentUser() async* {
-    final user = _auth.currentUser;
-    if (user == null) {
-      yield const [];
-      return;
-    }
-    await for (final values in _store.watchReports(user.uid)) {
-      yield values.map((value) => _toModel(value, values)).toList()
-        ..sort((a, b) =>
-            (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
-    }
-  }
+  Stream<List<ReportModel>> watchCurrentUser([String? targetUserId]) =>
+      watchReportsForUser(targetUserId);
 
   Future<String> createReport({
     required String locationId,
@@ -94,8 +93,7 @@ class ReportRepository {
     required String description,
     String? photoUrl,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw FirebaseAuthException(code: 'unauthenticated');
+    final userId = _currentUserId();
     final photoBytes = decodeReportPhoto(photoUrl);
     if (photoUrl != null &&
         (photoBytes == null ||
@@ -106,7 +104,7 @@ class ReportRepository {
     if (category != 'Wifi' && photoBytes == null) {
       throw RequiredReportPhotoException();
     }
-    final reports = await _store.readReports(user.uid);
+    final reports = await _store.readReports(userId);
     final now = DateTime.now().toUtc();
     final isDuplicate = reports.any((report) =>
         report['LocationId'] == locationId &&
@@ -140,7 +138,7 @@ class ReportRepository {
     final reportId = _newId(now);
     final record = <String, dynamic>{
       'Id': reportId,
-      'UserId': user.uid,
+      'UserId': userId,
       'LocationId': locationId,
       'Category': category,
       'Description': description,
@@ -151,9 +149,46 @@ class ReportRepository {
     };
     if (photoUrl != null) record['PhotoUrl'] = photoUrl;
     reports.add(record);
-    await _store.saveReports(user.uid, reports);
+    await _store.saveReports(userId, reports);
     return ReportSubmissionResult(
         ReportSubmissionState.processed, reportId, incidentId);
+  }
+
+  Future<void> updateReport({
+    required String reportId,
+    String? description,
+    ReportStatus? status,
+  }) async {
+    final userId = _currentUserId();
+    final reports = await _store.readReports(userId);
+    final index = reports.indexWhere((report) => report['Id'] == reportId);
+    if (index == -1) {
+      throw StateError('report_not_found');
+    }
+    final existing = Map<String, dynamic>.from(reports[index]);
+    final now = DateTime.now().toUtc();
+    if (description != null) {
+      final trimmed = description.trim();
+      if (trimmed.length < 10) {
+        throw ArgumentError.value(
+            description, 'description', 'Deskripsi minimal 10 karakter.');
+      }
+      existing['Description'] = trimmed;
+    }
+    if (status != null) {
+      existing['Status'] = status.value;
+    }
+    existing['UpdatedAt'] = now.toIso8601String();
+    reports[index] = existing;
+    await _store.saveReports(userId, reports);
+  }
+
+  Future<void> deleteReport(String reportId) async {
+    final userId = _currentUserId();
+    final removed = await _store.deleteReport(userId, reportId);
+    if (!removed) {
+      throw StateError('report_not_found');
+    }
   }
 
   ReportModel _toModel(
@@ -170,10 +205,13 @@ class ReportRepository {
             null,
             (latest, date) =>
                 latest == null || date.isAfter(latest) ? date : latest);
-    final resolved = lastReportAt != null &&
+    final explicitlyResolved =
+        value['Status'] == ReportStatus.resolved.value;
+    final autoResolved = lastReportAt != null &&
         lastReportAt.isBefore(DateTime.now().toUtc().subtract(
               const Duration(hours: 24),
             ));
+    final resolved = explicitlyResolved || autoResolved;
     return ReportModel(
       id: value['Id'] as String? ?? '',
       userId: value['UserId'] as String? ?? '',

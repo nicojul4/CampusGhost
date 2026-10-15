@@ -11,5 +11,7 @@ final authStateProvider = StreamProvider<User?>(
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) =>
     ProfileRepository(
         ref.watch(firebaseAuthProvider), ref.watch(localCampusStoreProvider)));
-final profilePhotoProvider = FutureProvider<Uint8List?>(
-    (ref) => ref.watch(profileRepositoryProvider).readCurrentPhoto());
+final profilePhotoProvider = FutureProvider<Uint8List?>((ref) {
+  ref.watch(authStateProvider);
+  return ref.watch(profileRepositoryProvider).readCurrentPhoto();
+});

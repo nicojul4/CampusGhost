@@ -138,12 +138,16 @@ class ReportSummaryCard extends StatelessWidget {
       required this.time,
       required this.reporter,
       this.evidencePhoto,
-      this.onTap});
+      this.onTap,
+      this.onEdit,
+      this.onDelete});
   final IconData icon;
   final String title, location, description, status, time, reporter;
   final Color statusColor, statusBg;
   final Uint8List? evidencePhoto;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   @override
   Widget build(BuildContext context) {
     final card = Container(
@@ -179,6 +183,46 @@ class ReportSummaryCard extends StatelessWidget {
               ])),
           const SizedBox(width: 6),
           StatusPill(status, color: statusColor, background: statusBg),
+          if (onEdit != null || onDelete != null) ...[
+            const SizedBox(width: 2),
+            PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              tooltip: 'Opsi laporan',
+              onSelected: (value) {
+                if (value == 'edit' && onEdit != null) onEdit!();
+                if (value == 'delete' && onDelete != null) onDelete!();
+              },
+              itemBuilder: (context) => [
+                if (onEdit != null)
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(children: [
+                      Icon(Icons.edit_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Edit laporan'),
+                    ]),
+                  ),
+                if (onDelete != null)
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(children: [
+                      Icon(Icons.delete_outline_rounded,
+                          size: 18, color: Theme.of(context).colorScheme.error),
+                      const SizedBox(width: 8),
+                      Text('Hapus laporan',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.error)),
+                    ]),
+                  ),
+              ],
+            ),
+          ],
         ]),
         const SizedBox(height: 11),
         Text(description,

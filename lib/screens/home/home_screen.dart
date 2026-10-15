@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,6 +5,8 @@ import '../../enums/facility_severity.dart';
 import '../../enums/report_category.dart';
 import '../../models/incident_model.dart';
 import '../../models/location_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/firebase_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/report_provider.dart';
@@ -28,7 +29,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final reports = ref.watch(reportsProvider);
     final locations = ref.watch(locationsProvider);
     final colors = Theme.of(context).colorScheme;
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.watch(authStateProvider).asData?.value ??
+        ref.watch(firebaseAuthProvider).currentUser;
     final name = user?.displayName?.split(' ').first ??
         user?.email?.split('@').first ??
         'Mahasiswa';

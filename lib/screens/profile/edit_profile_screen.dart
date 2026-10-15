@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../providers/firebase_provider.dart';
 import '../../repositories/profile_repository.dart';
 import '../../services/report_photo_codec.dart';
 
@@ -28,7 +29,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseAuthProvider).currentUser;
     _name = TextEditingController(
       text: user?.displayName ?? user?.email?.split('@').first ?? '',
     );
@@ -83,8 +84,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         _removePhoto = false;
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         _showMessage('Foto tidak dapat dibaca. Silakan pilih ulang.');
+      }
     }
   }
 
@@ -123,7 +125,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final photo = _selectedPhoto ?? (_removePhoto ? null : _savedPhoto);
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.watch(authStateProvider).asData?.value ??
+        ref.watch(firebaseAuthProvider).currentUser;
     final initial =
         _name.text.trim().isEmpty ? 'M' : _name.text.trim()[0].toUpperCase();
 
