@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../screens/home/home_screen.dart';
 import '../screens/report/create_report_screen.dart';
+import '../screens/report/api_reports_screen.dart';
 import '../screens/incident_detail/incident_detail_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -18,6 +19,7 @@ class AppRoutes {
   static const editProfile = '/profile/edit';
   static const detail = '/detail';
   static const createReport = '/create-report';
+  static const apiReports = '/api-reports';
 
   static Map<String, WidgetBuilder> get routes => {
         login: (_) => const LoginScreen(),
@@ -27,5 +29,6 @@ class AppRoutes {
         editProfile: (_) => const EditProfileScreen(),
         detail: (_) => const IncidentDetailScreen(),
         createReport: (_) => const CreateReportScreen(),
+        apiReports: (_) => const ApiReportsScreen(),
       };
 }

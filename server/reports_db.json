@@ -1,0 +1,50 @@
+[
+  {
+    "id": "rep_1792720724306_zifty",
+    "userId": "mhs_nicolas_2410",
+    "locationId": "gedung-1-lantai-2",
+    "category": "Proyektor",
+    "description": "Proyektor kelas 204 mati total saat presentasi.",
+    "photoUrl": null,
+    "status": "Active",
+    "incidentId": null,
+    "createdAt": "2026-10-23T01:58:44.306Z",
+    "updatedAt": "2026-10-23T01:58:44.306Z"
+  },
+  {
+    "id": "rep_1792720276268_xzn17",
+    "userId": "user_guest",
+    "locationId": "gedung-1-lantai-1",
+    "category": "Toilet",
+    "description": "Pintu toilet macet",
+    "photoUrl": null,
+    "status": "Active",
+    "incidentId": null,
+    "createdAt": "2026-10-23T01:51:16.268Z",
+    "updatedAt": "2026-10-23T01:51:16.268Z"
+  },
+  {
+    "id": "report-seed-1",
+    "userId": "user_nicolas",
+    "locationId": "gedung-1-lantai-3",
+    "category": "Wifi",
+    "description": "Koneksi Wi-Fi di lantai 3 Gedung 1 sering terputus.",
+    "status": "Active",
+    "incidentId": null,
+    "photoUrl": null,
+    "createdAt": "2026-10-23T00:50:58.870Z",
+    "updatedAt": "2026-10-23T00:50:58.871Z"
+  },
+  {
+    "id": "report-seed-2",
+    "userId": "user_pradita",
+    "locationId": "gedung-2-lantai-2",
+    "category": "AC",
+    "description": "AC di ruang 202 tidak dingin dan mengeluarkan bunyi bising.",
+    "status": "Active",
+    "incidentId": null,
+    "photoUrl": null,
+    "createdAt": "2026-10-23T01:20:58.871Z",
+    "updatedAt": "2026-10-23T01:20:58.871Z"
+  }
+]

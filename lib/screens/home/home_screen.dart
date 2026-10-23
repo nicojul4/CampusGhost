@@ -87,6 +87,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ]),
               ),
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: () => Navigator.pushNamed(context, AppRoutes.apiReports),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: colors.primary.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.cloud_sync_rounded, color: colors.primary, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Vertical Slice: Live API Reports',
+                              style: TextStyle(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Text('Buka daftar & simpan laporan terintegrasi backend REST API',
+                              style: TextStyle(
+                                  color: colors.onSurfaceVariant, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colors.primary),
+                  ]),
+                ),
+              ),
               const SizedBox(height: 14),
               reports.when(
                 loading: () => const LinearProgressIndicator(),
