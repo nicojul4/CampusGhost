@@ -2,8 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/report_model.dart';
 import '../repositories/report_repository.dart';
+import '../services/camera_photo_service.dart';
 import 'auth_provider.dart';
 import 'firebase_provider.dart';
+
+final cameraPhotoServiceProvider = Provider<CameraPhotoService>((ref) {
+  return CameraPhotoService();
+});
 
 final activeUserIdProvider = Provider<String>((ref) {
   final user = ref.watch(authStateProvider).asData?.value;
@@ -42,6 +47,9 @@ class ReportSubmissionNotifier extends AsyncNotifier<ReportSubmissionResult?> {
     required String category,
     required String description,
     String? photoUrl,
+    double? latitude,
+    double? longitude,
+    String? locationDetail,
   }) async {
     if (state.isLoading) {
       throw StateError('submission_in_progress');
@@ -53,6 +61,9 @@ class ReportSubmissionNotifier extends AsyncNotifier<ReportSubmissionResult?> {
             category: category,
             description: description,
             photoUrl: photoUrl,
+            latitude: latitude,
+            longitude: longitude,
+            locationDetail: locationDetail,
           );
       state = AsyncData(result);
       return result;

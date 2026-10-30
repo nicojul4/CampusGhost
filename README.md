@@ -2,6 +2,35 @@
 
 > **Campus Ghost — Real-time map of campus problems and conditions**
 
+## Implementasi MVP saat ini
+
+Campus Ghost adalah aplikasi Flutter untuk melihat kondisi fasilitas kampus dan membuat laporan gangguan. Aplikasi memakai Firebase Authentication untuk akun; laporan dan foto bukti disimpan terenkripsi di perangkat per UID dengan `flutter_secure_storage`. Data lokal tidak tersinkron ke perangkat mahasiswa lain. Endpoint REST di layar **Live API Reports** adalah vertical slice opsional dan memerlukan server tersendiri.
+
+### Menjalankan aplikasi
+
+1. Pasang Flutter stable dan Android SDK, lalu siapkan perangkat/emulator Android.
+2. Pastikan konfigurasi Firebase pada `lib/config/firebase_options.dart` mengarah ke proyek Firebase milik Anda. Aktifkan Email/Password di Firebase Authentication. Jangan commit konfigurasi proyek privat atau kredensial server.
+3. Dari root proyek jalankan:
+
+   ```sh
+   flutter pub get
+   flutter run
+   ```
+
+4. Daftar dengan email dan kata sandi, lalu buat laporan. Untuk mode API, jalankan backend yang sesuai dan sesuaikan base URL di `lib/config/api_config.dart`.
+
+Manifest Android meminta izin lokasi dan kamera saat fitur digunakan. Lokasi dapat dilewati dengan titik default Kampus Pradita; kategori Wi-Fi membolehkan laporan tanpa foto, sedangkan kategori lain meminta foto bukti maksimal 1 MB.
+
+### Fitur dan manfaat untuk pengguna
+
+- **Autentikasi Firebase** — daftar, login, sesi otomatis, route privat, dan logout. UID mengisolasi data laporan lokal antar akun pada perangkat yang sama.
+- **GPS** — koordinat aktual dan perkiraan area kampus membantu mahasiswa menjelaskan lokasi gangguan; bila layanan atau izin tidak tersedia, pengguna bisa memilih koordinat default atau lanjut tanpa koordinat.
+- **Kamera/galeri** — foto bukti melengkapi laporan agar kondisi fasilitas lebih mudah dipahami; preview bisa diganti atau dihapus sebelum disimpan.
+- **CRUD laporan** — laporan dapat dibuat dari formulir tervalidasi, dibaca di riwayat/detail, diedit, dan dihapus dengan konfirmasi. Penyimpanan bertahan setelah aplikasi ditutup.
+- **Pencarian kondisi kampus** — dashboard menampilkan ringkasan, filter kategori, peta ilustratif, dan detail incident.
+
+Urutan demo dan catatan verifikasi ada di [DEMO_SCRIPT.md](DEMO_SCRIPT.md) dan [REVIEW_REPORT.md](REVIEW_REPORT.md).
+
 ## Ide Project
 
 **Campus Ghost** adalah aplikasi mobile yang membantu mahasiswa melihat dan melaporkan **kondisi nyata fasilitas kampus secara real-time**, seperti Wi-Fi bermasalah, printer rusak, AC tidak nyaman, parkiran penuh, proyektor bermasalah, lift rusak, atau fasilitas lain yang sedang mengalami gangguan.
@@ -643,41 +672,9 @@ Pertemuan 5+     → Iterasi dan perbaikan UI berdasarkan progress
 
 ---
 
-# Timeline Project — 12 Pertemuan
+## Catatan scope prototipe
 
-## Status: Pertemuan 2 dari 12
-
-```text
-[██░░░░░░░░░░] 2/12
-```
-
-### Rencana Per Pertemuan
-
-| Pertemuan | Fokus                                                         | Status             |
-| --------- | ------------------------------------------------------------- | ------------------ |
-| 1         | Ide project, deskripsi masalah, README awal                   | ✅ Selesai         |
-| 2         | Tech stack, setup project Flutter + Firebase, struktur folder | 🔄 Sedang berjalan |
-| 3         | Autentikasi (Login/Register) + Setup Firestore                | ⬜ Belum           |
-| 4         | Campus Map — UI peta kampus dengan lokasi                     | ⬜ Belum           |
-| 5         | Location Detail — Status fasilitas per lokasi                 | ⬜ Belum           |
-| 6         | Report Issue — Form laporan masalah                           | ⬜ Belum           |
-| 7         | Incident Grouping — Logika pengelompokan laporan              | ⬜ Belum           |
-| 8         | Incident Detail — Halaman detail incident                     | ⬜ Belum           |
-| 9         | User Report History — Riwayat laporan                         | ⬜ Belum           |
-| 10        | Search & Filter + Live Campus Status                          | ⬜ Belum           |
-| 11        | Polish UI/UX, bug fixing, optimisasi                          | ⬜ Belum           |
-| 12        | Testing akhir, demo, dokumentasi final                        | ⬜ Belum           |
-
-### Prioritas Pertemuan 2
-
-```text
-✅ Finalisasi tech stack (Flutter + Firebase)
-⬜ Setup project Flutter
-⬜ Konfigurasi Firebase project
-⬜ Buat struktur folder project
-⬜ Setup koneksi Flutter ↔ Firebase
-⬜ Buat halaman dasar (Splash Screen, placeholder Home)
-```
+README ini juga menyimpan ide awal dan batasan proyek. Implementasi aktual MVP dan cara menjalankannya tercantum pada bagian **Implementasi MVP saat ini** di atas; Firebase Auth dipakai untuk akun, sementara laporan prototipe tersimpan lokal per UID dan belum menjadi layanan live bersama.
 
 ---
 

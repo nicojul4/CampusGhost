@@ -79,7 +79,7 @@ class _CampusGhostAppState extends State<CampusGhostApp> {
           child: child ?? const SizedBox.shrink(),
         ),
         home: widget.firebaseConfigured ? null : const _FirebaseSetupScreen(),
-        initialRoute: widget.firebaseConfigured ? AppRoutes.login : null,
+        initialRoute: widget.firebaseConfigured ? AppRoutes.root : null,
         routes: widget.firebaseConfigured ? AppRoutes.routes : const {},
       );
 }

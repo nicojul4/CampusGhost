@@ -8,11 +8,13 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/profile/edit_profile_screen.dart';
+import '../widgets/auth_gate.dart';
 
 class AppRoutes {
   AppRoutes._();
 
-  static const login = '/';
+  static const root = '/';
+  static const login = '/login';
   static const register = '/register';
   static const dashboard = '/dashboard';
   static const profile = '/profile';
@@ -22,13 +24,14 @@ class AppRoutes {
   static const apiReports = '/api-reports';
 
   static Map<String, WidgetBuilder> get routes => {
+        root: (_) => const AuthGate(),
         login: (_) => const LoginScreen(),
         register: (_) => const RegisterScreen(),
-        dashboard: (_) => const DashboardScreen(),
-        profile: (_) => const ProfileScreen(),
-        editProfile: (_) => const EditProfileScreen(),
-        detail: (_) => const IncidentDetailScreen(),
-        createReport: (_) => const CreateReportScreen(),
-        apiReports: (_) => const ApiReportsScreen(),
+        dashboard: (_) => const ProtectedRoute(child: DashboardScreen()),
+        profile: (_) => const ProtectedRoute(child: ProfileScreen()),
+        editProfile: (_) => const ProtectedRoute(child: EditProfileScreen()),
+        detail: (_) => const ProtectedRoute(child: IncidentDetailScreen()),
+        createReport: (_) => const ProtectedRoute(child: CreateReportScreen()),
+        apiReports: (_) => const ProtectedRoute(child: ApiReportsScreen()),
       };
 }

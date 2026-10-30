@@ -48,22 +48,22 @@ void main() {
     await tester.pumpWidget(_screen(Stream.value([_location])));
     await tester.pump(const Duration(milliseconds: 10));
     await tester.pumpAndSettle();
-    expect(find.text('Pilih kategori fasilitas'), findsOneWidget);
+    expect(find.text('1. Pilih Kategori Fasilitas'), findsOneWidget);
     expect(find.byType(Form), findsOneWidget);
   });
 
   testWidgets('menampilkan empty state saat belum ada lokasi', (tester) async {
     await tester.pumpWidget(_screen(Stream.value(const [])));
     await tester.pumpAndSettle();
-    expect(find.text('Belum ada lokasi terdaftar.'), findsOneWidget);
+    expect(find.text('Belum ada lokasi kampus terdaftar.'), findsOneWidget);
   });
 
   testWidgets('menampilkan error state dan tombol retry', (tester) async {
     await tester
         .pumpWidget(_screen(Stream.error(StateError('gagal memuat lokasi'))));
     await tester.pumpAndSettle();
-    expect(find.text('Lokasi gagal dimuat.'), findsOneWidget);
-    expect(find.text('Coba lagi'), findsOneWidget);
+    expect(find.text('Lokasi fasilitas kampus gagal dimuat.'), findsOneWidget);
+    expect(find.text('Coba Lagi'), findsOneWidget);
   });
 
   testWidgets('menampilkan validasi deskripsi saat form tidak valid',
@@ -84,6 +84,6 @@ void main() {
     );
     await tester.tap(find.text('Kirim Laporan Fasilitas'));
     await tester.pumpAndSettle();
-    expect(find.text('Jelaskan kendala minimal 10 karakter'), findsOneWidget);
+    expect(find.text('Deskripsi kendala wajib diisi.'), findsOneWidget);
   });
 }

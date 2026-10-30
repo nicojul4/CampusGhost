@@ -219,7 +219,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                               v == null || v.isEmpty
                                                   ? 'Masukkan kata sandi'
                                                   : null),
-                                      CheckboxListTile(
+                                      Material(
+                                        color: Colors.transparent,
+                                        child: CheckboxListTile(
                                           contentPadding: EdgeInsets.zero,
                                           controlAffinity:
                                               ListTileControlAffinity.leading,
@@ -228,12 +230,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                           onChanged: (v) => setState(
                                               () => _remember = v ?? false),
                                           title: Text(
-                                              'Ingat saya di perangkat ini',
-                                              style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .onSurfaceVariant))),
+                                            'Ingat saya di perangkat ini',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
                                       SizedBox(
                                           width: double.infinity,
                                           height: 50,

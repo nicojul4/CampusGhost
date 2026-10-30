@@ -92,6 +92,9 @@ class ReportRepository {
     required String category,
     required String description,
     String? photoUrl,
+    double? latitude,
+    double? longitude,
+    String? locationDetail,
   }) async {
     final userId = _currentUserId();
     final photoBytes = decodeReportPhoto(photoUrl);
@@ -148,6 +151,9 @@ class ReportRepository {
       'UpdatedAt': now.toIso8601String(),
     };
     if (photoUrl != null) record['PhotoUrl'] = photoUrl;
+    if (latitude != null) record['Latitude'] = latitude;
+    if (longitude != null) record['Longitude'] = longitude;
+    if (locationDetail != null) record['LocationDetail'] = locationDetail;
     reports.add(record);
     await _store.saveReports(userId, reports);
     return ReportSubmissionResult(
@@ -158,6 +164,10 @@ class ReportRepository {
     required String reportId,
     String? description,
     ReportStatus? status,
+    String? photoUrl,
+    double? latitude,
+    double? longitude,
+    String? locationDetail,
   }) async {
     final userId = _currentUserId();
     final reports = await _store.readReports(userId);
@@ -178,6 +188,22 @@ class ReportRepository {
     if (status != null) {
       existing['Status'] = status.value;
     }
+    if (photoUrl != null) {
+      if (photoUrl.isEmpty) {
+        existing.remove('PhotoUrl');
+      } else {
+        final photoBytes = decodeReportPhoto(photoUrl);
+        if (photoBytes == null ||
+            photoBytes.length > maxReportPhotoBytes ||
+            detectReportPhotoMimeType(photoBytes) == null) {
+          throw InvalidReportPhotoException();
+        }
+        existing['PhotoUrl'] = photoUrl;
+      }
+    }
+    if (latitude != null) existing['Latitude'] = latitude;
+    if (longitude != null) existing['Longitude'] = longitude;
+    if (locationDetail != null) existing['LocationDetail'] = locationDetail;
     existing['UpdatedAt'] = now.toIso8601String();
     reports[index] = existing;
     await _store.saveReports(userId, reports);
@@ -212,6 +238,8 @@ class ReportRepository {
               const Duration(hours: 24),
             ));
     final resolved = explicitlyResolved || autoResolved;
+    final latRaw = value['Latitude'];
+    final lngRaw = value['Longitude'];
     return ReportModel(
       id: value['Id'] as String? ?? '',
       userId: value['UserId'] as String? ?? '',
@@ -223,6 +251,9 @@ class ReportRepository {
       incidentId: value['IncidentId'] as String?,
       createdAt: createdAt,
       updatedAt: DateTime.tryParse(value['UpdatedAt'] as String? ?? ''),
+      latitude: latRaw is num ? latRaw.toDouble() : null,
+      longitude: lngRaw is num ? lngRaw.toDouble() : null,
+      locationDetail: value['LocationDetail'] as String?,
     );
   }
 

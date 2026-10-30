@@ -13,6 +13,9 @@ class ReportModel {
     required this.createdAt,
     required this.updatedAt,
     this.photoUrl,
+    this.latitude,
+    this.longitude,
+    this.locationDetail,
   });
 
   final String id;
@@ -25,6 +28,9 @@ class ReportModel {
   final String? incidentId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final double? latitude;
+  final double? longitude;
+  final String? locationDetail;
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {
     if (!json.containsKey('id') || json['id'] is! String || (json['id'] as String).trim().isEmpty) {
@@ -87,6 +93,29 @@ class ReportModel {
       throw const ValidationException('Field "incidentId" harus berupa String.');
     }
 
+    double? latitude;
+    if (json['latitude'] != null) {
+      if (json['latitude'] is num) {
+        latitude = (json['latitude'] as num).toDouble();
+      } else {
+        throw const ValidationException('Field "latitude" harus berupa angka desimal.');
+      }
+    }
+
+    double? longitude;
+    if (json['longitude'] != null) {
+      if (json['longitude'] is num) {
+        longitude = (json['longitude'] as num).toDouble();
+      } else {
+        throw const ValidationException('Field "longitude" harus berupa angka desimal.');
+      }
+    }
+
+    final locationDetailRaw = json['locationDetail'];
+    if (locationDetailRaw != null && locationDetailRaw is! String) {
+      throw const ValidationException('Field "locationDetail" harus berupa String.');
+    }
+
     return ReportModel(
       id: json['id'] as String,
       userId: userId,
@@ -98,6 +127,9 @@ class ReportModel {
       incidentId: incidentIdRaw as String?,
       createdAt: createdAt,
       updatedAt: updatedAt,
+      latitude: latitude,
+      longitude: longitude,
+      locationDetail: locationDetailRaw as String?,
     );
   }
 
@@ -112,6 +144,9 @@ class ReportModel {
         'incidentId': incidentId,
         'createdAt': createdAt?.toIso8601String(),
         'updatedAt': updatedAt?.toIso8601String(),
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (locationDetail != null) 'locationDetail': locationDetail,
       };
 
   ReportModel copyWith({
@@ -125,6 +160,9 @@ class ReportModel {
     String? incidentId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    double? latitude,
+    double? longitude,
+    String? locationDetail,
   }) =>
       ReportModel(
         id: id ?? this.id,
@@ -137,6 +175,9 @@ class ReportModel {
         incidentId: incidentId ?? this.incidentId,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        latitude: latitude ?? this.latitude,
+        longitude: longitude ?? this.longitude,
+        locationDetail: locationDetail ?? this.locationDetail,
       );
 
   @override
@@ -151,7 +192,10 @@ class ReportModel {
           description == other.description &&
           status == other.status &&
           photoUrl == other.photoUrl &&
-          incidentId == other.incidentId;
+          incidentId == other.incidentId &&
+          latitude == other.latitude &&
+          longitude == other.longitude &&
+          locationDetail == other.locationDetail;
 
   @override
   int get hashCode =>
@@ -162,5 +206,8 @@ class ReportModel {
       description.hashCode ^
       status.hashCode ^
       photoUrl.hashCode ^
-      incidentId.hashCode;
+      incidentId.hashCode ^
+      latitude.hashCode ^
+      longitude.hashCode ^
+      locationDetail.hashCode;
 }

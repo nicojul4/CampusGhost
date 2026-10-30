@@ -1,5 +1,29 @@
 [
   {
+    "id": "rep_1792851125803_7ck50",
+    "userId": "user_guest",
+    "locationId": "Gedung 1 Lantai 3",
+    "category": "Proyektor",
+    "description": "proyektor macet gak bisa digunakan",
+    "photoUrl": null,
+    "status": "Active",
+    "incidentId": null,
+    "createdAt": "2026-10-24T14:12:05.804Z",
+    "updatedAt": "2026-10-24T14:12:05.804Z"
+  },
+  {
+    "id": "rep_1792832453069_3g76q",
+    "userId": "user_guest",
+    "locationId": "Gedung 1 Lantai GF",
+    "category": "Wifi",
+    "description": "wifi tiba tiba mati",
+    "photoUrl": null,
+    "status": "Active",
+    "incidentId": null,
+    "createdAt": "2026-10-24T09:00:53.071Z",
+    "updatedAt": "2026-10-24T09:00:53.071Z"
+  },
+  {
     "id": "rep_1792720724306_zifty",
     "userId": "mhs_nicolas_2410",
     "locationId": "gedung-1-lantai-2",

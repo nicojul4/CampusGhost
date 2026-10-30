@@ -138,6 +138,7 @@ class ReportSummaryCard extends StatelessWidget {
       required this.time,
       required this.reporter,
       this.evidencePhoto,
+      this.coordinates,
       this.onTap,
       this.onEdit,
       this.onDelete});
@@ -145,6 +146,7 @@ class ReportSummaryCard extends StatelessWidget {
   final String title, location, description, status, time, reporter;
   final Color statusColor, statusBg;
   final Uint8List? evidencePhoto;
+  final String? coordinates;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
@@ -180,6 +182,25 @@ class ReportSummaryCard extends StatelessWidget {
                     style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12)),
+                if (coordinates != null && coordinates!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    const Icon(Icons.pin_drop_rounded, size: 12, color: campusGreen),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        coordinates!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: campusGreen,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ]),
+                ],
               ])),
           const SizedBox(width: 6),
           StatusPill(status, color: statusColor, background: statusBg),
