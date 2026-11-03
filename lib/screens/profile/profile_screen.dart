@@ -17,19 +17,6 @@ import '../../widgets/theme_mode_scope.dart';
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
-  Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    await const AuthService().signOut();
-    ref.invalidate(reportsProvider);
-    ref.invalidate(userReportsProvider);
-    ref.invalidate(incidentsProvider);
-    ref.invalidate(profilePhotoProvider);
-    ref.invalidate(authStateProvider);
-    if (context.mounted) {
-      Navigator.pushNamedAndRemoveUntil(
-          context, AppRoutes.login, (route) => false);
-    }
-  }
-
   Future<void> _editReport(
     BuildContext context,
     WidgetRef ref,
@@ -279,11 +266,7 @@ class ProfileScreen extends ConsumerWidget {
               label: 'Email',
               value: user?.email ?? '-'),
           const SizedBox(height: 16),
-          PrimaryButton(
-            label: 'Keluar dari akun',
-            icon: Icons.logout_rounded,
-            onPressed: () => _logout(context, ref),
-          ),
+          const _LogoutButton(),
           const SizedBox(height: 14),
           Center(
             child: Text('CampusGhost • Portal Fasilitas Mahasiswa',
@@ -391,6 +374,50 @@ class _EditReportDialog extends StatefulWidget {
   State<_EditReportDialog> createState() => _EditReportDialogState();
 }
 
+class _LogoutButton extends ConsumerStatefulWidget {
+  const _LogoutButton();
+
+  @override
+  ConsumerState<_LogoutButton> createState() => _LogoutButtonState();
+}
+
+class _LogoutButtonState extends ConsumerState<_LogoutButton> {
+  bool _loading = false;
+
+  Future<void> _logout() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      await const AuthService().signOut();
+      ref.invalidate(reportsProvider);
+      ref.invalidate(userReportsProvider);
+      ref.invalidate(incidentsProvider);
+      ref.invalidate(profilePhotoProvider);
+      ref.invalidate(authStateProvider);
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+            context, AppRoutes.login, (route) => false);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gagal keluar dari akun. Periksa koneksi lalu coba lagi.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => PrimaryButton(
+        label: _loading ? 'Keluar...' : 'Keluar dari akun',
+        icon: Icons.logout_rounded,
+        isLoading: _loading,
+        onPressed: _loading ? null : _logout,
+      );
+}
+
 class _EditReportDialogState extends State<_EditReportDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _controller;
@@ -459,6 +486,7 @@ class _EditReportDialogState extends State<_EditReportDialog> {
                 maxLines: 3,
                 enabled: !_isSaving,
                 decoration: const InputDecoration(
+                  labelText: 'Deskripsi Kendala',
                   hintText: 'Jelaskan kendala fasilitas minimal 10 karakter',
                 ),
                 validator: (value) {

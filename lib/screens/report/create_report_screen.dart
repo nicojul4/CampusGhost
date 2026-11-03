@@ -283,19 +283,22 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
+                  color: Theme.of(sheetContext).colorScheme.outline,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const Text(
+              Text(
                 'Lampirkan Bukti Foto Fasilitas',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Ambil langsung dengan kamera atau unggah dari galeri dokumen.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 20),
               ListTile(
@@ -363,14 +366,14 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.message),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } on UnsupportedPhotoFormatException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.message),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } catch (e) {
@@ -428,17 +431,17 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
   // ===========================================================================
   Future<void> _submit() async {
     if (_category == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Pilih kategori fasilitas terlebih dahulu.'),
-        backgroundColor: Colors.red,
+        backgroundColor: Theme.of(context).colorScheme.error,
       ));
       return;
     }
 
     if (_category != ReportCategory.wifi && _photoBytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Tambahkan bukti foto untuk kategori ini (Wajib).'),
-        backgroundColor: Colors.red,
+        backgroundColor: Theme.of(context).colorScheme.error,
       ));
       return;
     }
@@ -505,30 +508,30 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
       );
     } on RequiredReportPhotoException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Tambahkan bukti foto untuk kategori ini.'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } on InvalidReportPhotoException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Bukti foto tidak valid. Pilih file gambar kembali.'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } on LocalPhotoStorageLimitException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Penyimpanan bukti foto akun ini penuh (maks 3 MB).'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Laporan gagal disimpan: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     }
@@ -808,7 +811,10 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                           const SizedBox(height: 6),
                           Text(
                             _locationError!,
-                            style: const TextStyle(color: Colors.red, fontSize: 11),
+                            style: TextStyle(
+                              color: colors.error,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ],
@@ -828,6 +834,7 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
                     decoration: const InputDecoration(
                       filled: true,
                       alignLabelWithHint: true,
+                      labelText: 'Deskripsi Kendala',
                       hintText: 'Contoh: Wi-Fi sering terputus di area meja belajar lantai 3 dekat lift...',
                     ),
                     validator: (value) {

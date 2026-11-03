@@ -137,6 +137,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             labelText: 'Kata sandi',
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Tampilkan kata sandi'
+                                  : 'Sembunyikan kata sandi',
                               onPressed: () => setState(
                                   () => _obscurePassword = !_obscurePassword),
                               icon: Icon(_obscurePassword
@@ -159,6 +162,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             labelText: 'Ulangi kata sandi',
                             prefixIcon: const Icon(Icons.lock_reset_outlined),
                             suffixIcon: IconButton(
+                              tooltip: _obscureConfirmation
+                                  ? 'Tampilkan kata sandi'
+                                  : 'Sembunyikan kata sandi',
                               onPressed: () => setState(() =>
                                   _obscureConfirmation = !_obscureConfirmation),
                               icon: Icon(_obscureConfirmation

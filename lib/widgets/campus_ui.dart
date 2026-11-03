@@ -59,25 +59,24 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
       ]),
       actions: [
         IconButton(
+            tooltip: 'Notifikasi',
             onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Belum ada notifikasi baru.'))),
             icon: const Icon(Icons.notifications_none_rounded)),
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: InkWell(
-            onTap: onProfile,
-            borderRadius: BorderRadius.circular(24),
-            child: CircleAvatar(
-                radius: 17,
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                backgroundImage:
-                    profilePhoto == null ? null : MemoryImage(profilePhoto),
-                child: profilePhoto == null
-                    ? Text(initial,
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w800))
-                    : null),
+        IconButton(
+          tooltip: 'Buka profil',
+          onPressed: onProfile,
+          icon: CircleAvatar(
+            radius: 18,
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            backgroundImage:
+                profilePhoto == null ? null : MemoryImage(profilePhoto),
+            child: profilePhoto == null
+                ? Text(initial,
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w800))
+                : null,
           ),
         ),
       ],

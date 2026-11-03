@@ -41,12 +41,22 @@ class IncidentDetailScreen extends ConsumerWidget {
   }
 }
 
-class _IncidentDetails extends ConsumerWidget {
+class _IncidentDetails extends ConsumerStatefulWidget {
   const _IncidentDetails({required this.incident});
 
   final IncidentModel incident;
 
+  @override
+  ConsumerState<_IncidentDetails> createState() => _IncidentDetailsState();
+}
+
+class _IncidentDetailsState extends ConsumerState<_IncidentDetails> {
+  bool _submitting = false;
+
+  IncidentModel get incident => widget.incident;
+
   Future<void> _report(BuildContext context, WidgetRef ref) async {
+    if (_submitting) return;
     if (incident.category != 'Wifi') {
       await Navigator.pushNamed(
         context,
@@ -59,6 +69,7 @@ class _IncidentDetails extends ConsumerWidget {
       );
       return;
     }
+    setState(() => _submitting = true);
     try {
       final result = await ref.read(reportRepositoryProvider).createQuickReport(
             locationId: incident.locationId,
@@ -79,11 +90,13 @@ class _IncidentDetails extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Laporan gagal dikirim. Periksa koneksi dan akun Anda.'),
       ));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final reports = ref.watch(incidentReportsProvider(incident.id));
     final locations = ref.watch(locationsProvider);
@@ -180,11 +193,19 @@ class _IncidentDetails extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: () => _report(context, ref),
-          icon: const Icon(Icons.add_alert_outlined),
-          label: Text(incident.category == 'Wifi'
-              ? 'Saya Juga Mengalami Ini'
-              : 'Laporkan dengan bukti foto'),
+          onPressed: _submitting ? null : () => _report(context, ref),
+          icon: _submitting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.add_alert_outlined),
+          label: Text(_submitting
+              ? 'Mengirim laporan...'
+              : incident.category == 'Wifi'
+                  ? 'Saya Juga Mengalami Ini'
+                  : 'Laporkan dengan bukti foto'),
           style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
               textStyle: const TextStyle(fontWeight: FontWeight.w800)),

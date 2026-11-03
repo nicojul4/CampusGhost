@@ -158,18 +158,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                               fontSize: 12,
                                               height: 1.45)),
                                       const SizedBox(height: 18),
-                                      const Text(
-                                          'Email Mahasiswa / NIM Pradita',
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700)),
-                                      const SizedBox(height: 6),
                                       TextFormField(
                                           controller: _email,
                                           keyboardType:
                                               TextInputType.emailAddress,
                                           textInputAction: TextInputAction.next,
                                           decoration: const InputDecoration(
+                                              labelText:
+                                                  'Email Mahasiswa / NIM Pradita',
                                               prefixIcon: Icon(Icons
                                                   .alternate_email_rounded),
                                               hintText:
@@ -181,13 +177,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       const SizedBox(height: 13),
                                       Row(
                                           mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
+                                              MainAxisAlignment.end,
                                           children: [
-                                            const Text('Kata Sandi',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.w700)),
                                             TextButton(
                                                 onPressed: () => ScaffoldMessenger
                                                         .of(context)
@@ -203,10 +194,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                           controller: _password,
                                           obscureText: _obscure,
                                           decoration: InputDecoration(
+                                              labelText: 'Kata Sandi',
                                               prefixIcon: const Icon(
                                                   Icons.lock_outline_rounded),
                                               hintText: '••••••••',
                                               suffixIcon: IconButton(
+                                                  tooltip: _obscure
+                                                      ? 'Tampilkan kata sandi'
+                                                      : 'Sembunyikan kata sandi',
                                                   onPressed: () => setState(
                                                       () =>
                                                           _obscure = !_obscure),

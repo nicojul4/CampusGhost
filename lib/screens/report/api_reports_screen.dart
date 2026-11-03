@@ -24,7 +24,9 @@ class _ApiReportsScreenState extends ConsumerState<ApiReportsScreen> {
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
         ),
-        child: const _CreateReportFormSheet(),
+        child: const SingleChildScrollView(
+          child: _CreateReportFormSheet(),
+        ),
       ),
     );
   }
@@ -538,6 +540,7 @@ class _CreateReportFormSheetState
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
                 IconButton(
+                  tooltip: 'Tutup formulir',
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => Navigator.pop(context),
                 ),
@@ -586,6 +589,7 @@ class _CreateReportFormSheetState
                 prefixIcon: Icon(Icons.description_outlined),
               ),
               maxLines: 3,
+              textInputAction: TextInputAction.done,
               validator: (val) {
                 if (val == null || val.trim().isEmpty) {
                   return 'Deskripsi wajib diisi.';
