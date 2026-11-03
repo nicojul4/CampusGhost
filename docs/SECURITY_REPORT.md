@@ -1,7 +1,7 @@
 # Security Report
 
 - Tanggal audit: 2026-11-03 (UTC)
-- Ruang lingkup: tracked source/configuration, seluruh riwayat Git (17 commit), perubahan branch terhadap `origin/main`, dependency Functions, Firebase rules, dan local API.
+- Ruang lingkup: tracked source/configuration, seluruh riwayat Git, perubahan branch terhadap `origin/main`, dependency Functions, Firebase rules, dan local API.
 - Runtime/tooling: Node.js 22.22.2, npm 11.6.2, Flutter 3.47.6, Dart 3.13.5, Gitleaks (binary tidak melaporkan nomor versi), TruffleHog `dev`.
 
 ## Ringkasan
@@ -19,9 +19,9 @@
 | Tool | Cakupan dan hasil |
 | --- | --- |
 | `npm audit --json` | Functions dependency tree: 8 Moderate, 0 High, 0 Critical. Exit 1 karena advisory Moderate masih ada. Audit awal menemukan 1 High dan 10 Moderate; perbaikan kompatibel menghapus High dan 2 Moderate. |
-| Gitleaks `git --log-opts=--all --redact=100` | 17 commit dipindai; 1 kandidat `gcp-api-key` pada konfigurasi Firebase web di commit lama. Nilai tidak disimpan dalam laporan ini. |
+| Gitleaks `git --log-opts=--all --redact=100` | 1 kandidat `gcp-api-key` pada konfigurasi Firebase web di commit lama. Nilai tidak disimpan dalam laporan ini. |
 | TruffleHog `git ... --no-verification --json --no-update` | 1 deteksi Google API key yang sama, `Verified: false`, pada file/baris yang sama. |
-| Gitleaks perubahan branch | `origin/main..HEAD`: 1 commit dipindai, tidak ada temuan. |
+| Gitleaks perubahan branch | `origin/main..HEAD`: tidak ada temuan pada perubahan branch. |
 | Flutter analyzer | Tidak ada isu static analysis. Semgrep tidak terpasang. |
 
 Scan working tree penuh di checkout awal juga membaca cache browser Flutter lokal yang diabaikan Git (`.dart_tool/chrome-device/**`) dan menghasilkan 1.316 kandidat pola API key/JWT. Cache tersebut bukan tracked source dan tidak masuk commit. Isi kandidat tidak disalin atau dicatat; pemilik lokal sebaiknya menghapus cache dengan prosedur Flutter bila tidak diperlukan. Scan archive tracked source menghasilkan kembali hanya satu kandidat Firebase yang dijelaskan di bawah.

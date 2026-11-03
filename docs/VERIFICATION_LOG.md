@@ -34,8 +34,8 @@ Tanggal: 2026-11-03. Semua waktu berikut UTC. Verifikasi akhir dilakukan dari cl
 | Langkah | Perintah | Hasil / exit code | Waktu (UTC) | Catatan |
 | --- | --- | --- | --- | --- |
 | Dependency audit | `npm audit --json` | Exit 1 karena 8 Moderate; High 0; Critical 0 | 2026-11-03 | Registry dapat diakses saat retry. Rincian dan rekomendasi ada di [SECURITY_REPORT.md](SECURITY_REPORT.md). |
-| Riwayat secret | `gitleaks git --log-opts=--all --redact=100 ...` | Exit 1; 17 commit dipindai, 1 kandidat historis | 2026-11-03 | Kandidat ada di Firebase client options lama; nilainya tidak dicatat. |
-| Secret branch baru | `gitleaks git --log-opts=origin/main..HEAD --redact=100 ...` | PASS, 0; tidak ada leak | 2026-11-03 | Saat scan dilakukan branch memiliki 1 commit baru. Ulangi setelah commit dokumentasi sebelum merge. |
+| Riwayat secret | `gitleaks git --log-opts=--all --redact=100 ...` | Exit 1; 1 kandidat historis | 2026-11-03 | Kandidat ada di Firebase client options lama; nilainya tidak dicatat. |
+| Secret branch baru | `gitleaks git --log-opts=origin/main..HEAD --redact=100 ...` | PASS, 0; tidak ada leak | 2026-11-03 | Scan terakhir mencakup kode dan dokumentasi handover. |
 | Scan TruffleHog | `trufflehog git ... --no-verification --json --no-update` | Exit 0; 1 temuan, belum terverifikasi | 2026-11-03 | Detector menunjuk field konfigurasi Firebase web yang sama; output mentah tidak disimpan. |
 | Source-only scan | `git archive HEAD` lalu `gitleaks dir --max-target-megabytes=10 --redact=100 ...` | Exit 1; 1 kandidat | 2026-11-03 | Hanya file tracked; kandidat sama dengan konfigurasi client Firebase lama. |
 
