@@ -13,7 +13,7 @@ Campus Ghost is a Flutter app for viewing campus facility issues and submitting 
 ## Fresh clone and install
 
 ```sh
-git clone --branch chore/handover-verification https://github.com/nicojul4/CampusGhost.git
+git clone https://github.com/nicojul4/CampusGhost.git
 cd CampusGhost
 flutter pub get
 cd functions
