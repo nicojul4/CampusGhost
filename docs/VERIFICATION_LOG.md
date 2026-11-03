@@ -44,3 +44,19 @@ Tanggal: 2026-11-03. Semua waktu berikut UTC. Verifikasi akhir dilakukan dari cl
 - **TIDAK TERVERIFIKASI:** Firebase Auth sign-up/login, baca/tulis cloud Firebase, dan pembatasan API key di konsol Google Cloud memerlukan proyek/akses yang tidak tersedia pada verifikasi lokal.
 - **TIDAK TERVERIFIKASI:** Deploy Firebase/staging dan CI; tidak ada target Firebase Hosting, Dockerfile, atau workflow CI yang tracked. Demo release lokal melalui HTTP berhasil.
 - Security scan direktori checkout awal menemukan banyak kandidat pada cache browser Flutter lokal yang diabaikan Git; rincian aman dan statusnya dijelaskan di [SECURITY_REPORT.md](SECURITY_REPORT.md).
+
+## Replay README dari clone baru
+
+Instruksi build/run/test/deploy README diikuti lagi dari clone lokal baru pada commit `a023e1f`, dengan hasil berikut. Clone ini tidak membawa cache atau dependency lama.
+
+| Langkah | Perintah | Hasil / exit code | Waktu (UTC) | Catatan |
+| --- | --- | --- | --- | --- |
+| Clone perintah README | `git clone https://github.com/nicojul4/CampusGhost.git` | PASS, 0 | 2026-11-03 03:40 | Clone default remote berhasil anonim. Pada saat itu remote belum memuat branch handover. |
+| Clone kode handover | `git clone --no-hardlinks --branch chore/handover-verification /home/nicolas/CampusGhost /tmp/campusghost-readme-final` | PASS, 0 | 2026-11-03 03:40 | Clone lokal branch; tidak ada cache/dependency. |
+| Install README | `flutter pub get`, lalu `npm ci` dari `functions/` | PASS, 0 untuk keduanya | 03:40–03:41 | Dependency berhasil dibuat dari clone bersih. |
+| Run README | `node server.js` dari `server/`; `flutter run -d web-server --web-port 8080 --web-hostname 127.0.0.1` | PASS; app dan API start | 03:41–03:42 | Proses dihentikan setelah cek. |
+| Cek HTTP README | Dua perintah `curl` README ke app dan API health | PASS; HTTP 200 (1.585 byte) dan HTTP 200 (37 byte) | 03:42 | Origin allowlisted. |
+| Analyze/test README | `flutter analyze`; `flutter test --reporter expanded` | PASS; analyze 0 issue; tests PASS 30, FAIL 0, SKIP 0 | 03:43 | Semua test dijalankan. |
+| Build README | `flutter build web --release`; `npm run build` dari `functions/` | PASS, 0 untuk keduanya | 03:44–03:46 | Warning Wasm sama seperti build awal; release web dan Functions build berhasil. |
+| Deploy README | `python3 -m http.server 18081 --bind 127.0.0.1 --directory build/web`, lalu curl README | PASS; HTTP 200 (1.585 byte) | 03:46 | Deploy lokal release dapat diakses. |
+| Push / PR | `git push -u origin chore/handover-verification` | TIDAK TERVERIFIKASI; exit 128, Git meminta username HTTPS tanpa perangkat input | 2026-11-03 | Remote branch clone juga gagal karena branch belum ada di remote. `gh` CLI tidak tersedia; PR belum dibuat. |
