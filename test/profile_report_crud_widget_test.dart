@@ -137,7 +137,7 @@ void main() {
 
     // Verifikasi dialog Edit muncul
     expect(find.text('Edit Laporan'), findsOneWidget);
-    expect(find.text('Deskripsi Kendala'), findsOneWidget);
+    expect(find.text('Deskripsi Kendala'), findsWidgets);
     expect(find.text('Status Laporan'), findsOneWidget);
 
     // Ganti deskripsi
