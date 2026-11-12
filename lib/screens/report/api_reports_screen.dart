@@ -48,7 +48,7 @@ class _ApiReportsScreenState extends ConsumerState<ApiReportsScreen> {
               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
             ),
             Text(
-              'Live REST API Vertical Slice',
+              'Cloud Firestore • Real-Time Kampus',
               style: TextStyle(
                 fontSize: 12,
                 color: colors.primary,

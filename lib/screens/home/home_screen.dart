@@ -72,12 +72,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(children: [
-                  Icon(Icons.lock_outline_rounded,
+                  Icon(Icons.cloud_done_rounded,
                       color: colors.onSecondaryContainer, size: 19),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
-                      'Mode lokal: laporan hanya tersimpan di perangkat dan akun ini, belum terlihat oleh mahasiswa lain.',
+                      'Terhubung ke Cloud Firestore: laporan disinkronkan langsung ke seluruh kampus secara real-time.',
                       style: TextStyle(
                         color: colors.onSecondaryContainer,
                         fontSize: 12,
@@ -105,13 +105,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Vertical Slice: Live API Reports',
+                          Text('Laporan Fasilitas Kampus (Real-Time)',
                               style: TextStyle(
                                   color: colors.primary,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 13)),
                           const SizedBox(height: 2),
-                          Text('Buka daftar & simpan laporan terintegrasi backend REST API',
+                          Text('Daftar & pantau laporan fasilitas kampus dari Cloud Firestore',
                               style: TextStyle(
                                   color: colors.onSurfaceVariant, fontSize: 11)),
                         ],

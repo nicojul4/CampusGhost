@@ -12,33 +12,18 @@ service cloud.firestore {
     }
 
     match /locations/{locationId} {
-      allow read: if signedIn();
+      allow read: if true;
       allow write: if false;
     }
 
     match /reports/{reportId} {
-      allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly([
-          'UserId', 'LocationId', 'Category', 'Description', 'PhotoUrl'
-        ])
-        && request.resource.data.keys().hasAll([
-          'UserId', 'LocationId', 'Category', 'Description'
-        ])
-        && request.resource.data.UserId == request.auth.uid
-        && request.resource.data.LocationId is string
-        && request.resource.data.Category is string
-        && request.resource.data.Description is string
-        && (request.resource.data.Category == 'Wifi'
-          || ('PhotoUrl' in request.resource.data
-            && request.resource.data.PhotoUrl is string))
-        && (!('PhotoUrl' in request.resource.data)
-          || request.resource.data.PhotoUrl is string);
-      allow update, delete: if false;
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if signedIn();
     }
 
     match /incidents/{incidentId} {
-      allow read: if signedIn();
+      allow read: if true;
       allow write: if false;
     }
   }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../exceptions/api_exception.dart';
 import '../models/report_model.dart';
 import '../repositories/report_api_repository.dart';
+import '../services/firestore_report_service.dart';
 import '../services/report_api_service.dart';
 
 enum ApiReportStatus { loading, empty, error, success }
@@ -55,9 +56,22 @@ class ApiReportsState {
 final reportApiServiceProvider =
     Provider<ReportApiService>((ref) => ReportApiService());
 
+final firestoreReportServiceProvider =
+    Provider<FirestoreReportService?>((ref) {
+  try {
+    return FirestoreReportService();
+  } catch (_) {
+    return null;
+  }
+});
+
 final reportApiRepositoryProvider = Provider<ReportApiRepository>((ref) {
   final apiService = ref.watch(reportApiServiceProvider);
-  return ReportApiRepository(apiService);
+  final firestoreService = ref.watch(firestoreReportServiceProvider);
+  return ReportApiRepository(
+    apiService,
+    firestoreService: firestoreService,
+  );
 });
 
 final apiReportsNotifierProvider =
@@ -82,7 +96,8 @@ class ApiReportsNotifier extends Notifier<ApiReportsState> {
         state = ApiReportsState.success(items);
       }
     } on ApiException catch (e) {
-      state = ApiReportsState.error('Gagal memuat laporan (${e.statusCode}): ${e.message}');
+      state = ApiReportsState.error(
+          'Gagal memuat laporan (${e.statusCode}): ${e.message}');
     } on NetworkException catch (e) {
       state = ApiReportsState.error('Koneksi bermasalah: ${e.message}');
     } on ValidationException catch (e) {
@@ -101,6 +116,7 @@ class ApiReportsNotifier extends Notifier<ApiReportsState> {
     required String locationId,
     required String description,
     String? userId,
+    String? photoUrl,
   }) async {
     state = state.copyWith(isSubmitting: true);
     try {
@@ -110,6 +126,7 @@ class ApiReportsNotifier extends Notifier<ApiReportsState> {
         locationId: locationId,
         description: description,
         userId: userId,
+        photoUrl: photoUrl,
       );
       await fetchReports();
       return newReport;

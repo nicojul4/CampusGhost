@@ -1,13 +1,30 @@
+import '../config/api_config.dart';
 import '../exceptions/api_exception.dart';
 import '../models/report_model.dart';
+import '../services/firestore_report_service.dart';
 import '../services/report_api_service.dart';
 
 class ReportApiRepository {
-  ReportApiRepository(this._apiService);
+  ReportApiRepository(
+    this._apiService, {
+    FirestoreReportService? firestoreService,
+  }) : _firestoreService = firestoreService;
 
   final ReportApiService _apiService;
+  final FirestoreReportService? _firestoreService;
 
   Future<List<ReportModel>> getReports() async {
+    final isSimulated = ApiConfig.baseUrl != ApiConfig.defaultBaseUrl;
+
+    if (!isSimulated && _firestoreService != null) {
+      try {
+        final firestoreReports = await _firestoreService.getReports();
+        return firestoreReports;
+      } catch (_) {
+        // Fallback to REST API if Firestore threw
+      }
+    }
+
     try {
       final rawList = await _apiService.fetchReports();
       return rawList.map((item) => ReportModel.fromJson(item)).toList();
@@ -31,6 +48,23 @@ class ReportApiRepository {
     String? userId,
     String? photoUrl,
   }) async {
+    final isSimulated = ApiConfig.baseUrl != ApiConfig.defaultBaseUrl;
+
+    if (!isSimulated && _firestoreService != null) {
+      try {
+        final newReport = await _firestoreService.createReport(
+          category: category,
+          locationId: locationId,
+          description: description,
+          userId: userId,
+          photoUrl: photoUrl,
+        );
+        return newReport;
+      } catch (_) {
+        // Fallback to REST API
+      }
+    }
+
     final payload = <String, dynamic>{
       'category': category,
       'locationId': locationId,
