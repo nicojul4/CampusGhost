@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/local_campus_store.dart';
 import '../services/report_photo_codec.dart';
+import '../validators/profile_validators.dart';
 
 class InvalidProfilePhotoException implements Exception {}
 
@@ -28,19 +29,23 @@ class ProfileRepository {
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw FirebaseAuthException(code: 'unauthenticated');
+
     final trimmedName = name.trim();
-    if (trimmedName.isEmpty || trimmedName.length > 80) {
+    if (validateProfileName(trimmedName) != null) {
       throw ArgumentError.value(name, 'name');
     }
-    if (photoBytes != null &&
-        (photoBytes.length > maxReportPhotoBytes ||
-            detectReportPhotoMimeType(photoBytes) == null)) {
-      throw InvalidProfilePhotoException();
+
+    if (photoBytes != null) {
+      final result = validateProfilePhoto(photoBytes);
+      if (result != PhotoValidationResult.valid) {
+        throw InvalidProfilePhotoException();
+      }
     }
 
     if (user.displayName != trimmedName) {
       await user.updateDisplayName(trimmedName);
     }
+
     try {
       if (removePhoto) {
         await _store.deleteProfilePhoto(user.uid);

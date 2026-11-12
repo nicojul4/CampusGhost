@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/firebase_provider.dart';
 import '../../repositories/profile_repository.dart';
-import '../../services/report_photo_codec.dart';
+import '../../validators/profile_validators.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -65,17 +65,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ],
       );
       if (file == null) return;
-      if (await file.length() > maxReportPhotoBytes) {
-        if (mounted) _showMessage('Ukuran foto maksimal 1 MB.');
-        return;
-      }
       final bytes = await file.readAsBytes();
-      final mimeType = detectReportPhotoMimeType(bytes);
-      if (bytes.length > maxReportPhotoBytes || mimeType == null) {
-        if (mounted) {
-          _showMessage(
-              'Pilih foto JPG, PNG, atau WebP yang valid, maksimal 1 MB.');
-        }
+      final result = validateProfilePhoto(bytes);
+      if (result != PhotoValidationResult.valid) {
+        if (mounted) _showMessage(photoValidationMessage(result));
         return;
       }
       if (!mounted) return;
@@ -147,32 +140,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Center(
-                          child: Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              CircleAvatar(
-                                radius: 52,
-                                backgroundColor: colors.primaryContainer,
-                                backgroundImage:
-                                    photo == null ? null : MemoryImage(photo),
-                                child: _loadingPhoto && photo == null
-                                    ? const CircularProgressIndicator()
-                                    : photo == null
-                                        ? Text(initial,
-                                            style: TextStyle(
-                                                color: colors.primary,
-                                                fontSize: 36,
-                                                fontWeight: FontWeight.w800))
-                                        : null,
-                              ),
-                              IconButton.filled(
-                                tooltip: 'Pilih foto profil',
-                                onPressed: _saving ? null : _choosePhoto,
-                                icon: const Icon(Icons.photo_camera_outlined),
-                              ),
-                            ],
-                          ),
+                        _ProfileAvatar(
+                          photo: photo,
+                          initial: initial,
+                          isLoading: _loadingPhoto,
+                          isSaving: _saving,
+                          onChoosePhoto: _choosePhoto,
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -183,36 +156,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ),
                         if (photo != null) ...[
                           const SizedBox(height: 8),
-                          TextButton.icon(
-                            onPressed: _saving
-                                ? null
-                                : () => setState(() {
-                                      _selectedPhoto = null;
-                                      _removePhoto = true;
-                                    }),
-                            icon: const Icon(Icons.delete_outline_rounded),
-                            label: const Text('Hapus foto profil'),
+                          _RemovePhotoButton(
+                            isSaving: _saving,
+                            onRemove: () => setState(() {
+                              _selectedPhoto = null;
+                              _removePhoto = true;
+                            }),
                           ),
                         ],
                         const SizedBox(height: 20),
                         TextFormField(
                           controller: _name,
                           textCapitalization: TextCapitalization.words,
-                          maxLength: 80,
+                          maxLength: maxProfileNameLength,
                           decoration: const InputDecoration(
                             labelText: 'Nama tampilan',
                             prefixIcon: Icon(Icons.person_outline_rounded),
                           ),
                           onChanged: (_) => setState(() {}),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Nama tidak boleh kosong.';
-                            }
-                            if (value.trim().length > 80) {
-                              return 'Nama maksimal 80 karakter.';
-                            }
-                            return null;
-                          },
+                          validator: validateProfileName,
                         ),
                         const SizedBox(height: 5),
                         InputDecorator(
@@ -223,18 +185,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           child: Text(user?.email ?? 'Email tidak tersedia'),
                         ),
                         const SizedBox(height: 22),
-                        FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: _saving
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.save_outlined),
-                          label:
-                              Text(_saving ? 'Menyimpan...' : 'Simpan profil'),
+                        _SaveButton(
+                          isSaving: _saving,
+                          onSave: _save,
                         ),
                       ],
                     ),
@@ -247,4 +200,95 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Sub-widgets yang diekstrak dari build() untuk memisahkan tanggung jawab UI
+// ---------------------------------------------------------------------------
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({
+    required this.photo,
+    required this.initial,
+    required this.isLoading,
+    required this.isSaving,
+    required this.onChoosePhoto,
+  });
+
+  final Uint8List? photo;
+  final String initial;
+  final bool isLoading;
+  final bool isSaving;
+  final VoidCallback onChoosePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          CircleAvatar(
+            radius: 52,
+            backgroundColor: colors.primaryContainer,
+            backgroundImage: photo == null ? null : MemoryImage(photo!),
+            child: isLoading && photo == null
+                ? const CircularProgressIndicator()
+                : photo == null
+                    ? Text(initial,
+                        style: TextStyle(
+                            color: colors.primary,
+                            fontSize: 36,
+                            fontWeight: FontWeight.w800))
+                    : null,
+          ),
+          IconButton.filled(
+            tooltip: 'Pilih foto profil',
+            onPressed: isSaving ? null : onChoosePhoto,
+            icon: const Icon(Icons.photo_camera_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RemovePhotoButton extends StatelessWidget {
+  const _RemovePhotoButton({
+    required this.isSaving,
+    required this.onRemove,
+  });
+
+  final bool isSaving;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+        onPressed: isSaving ? null : onRemove,
+        icon: const Icon(Icons.delete_outline_rounded),
+        label: const Text('Hapus foto profil'),
+      );
+}
+
+class _SaveButton extends StatelessWidget {
+  const _SaveButton({
+    required this.isSaving,
+    required this.onSave,
+  });
+
+  final bool isSaving;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) => FilledButton.icon(
+        onPressed: isSaving ? null : onSave,
+        icon: isSaving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.save_outlined),
+        label: Text(isSaving ? 'Menyimpan...' : 'Simpan profil'),
+      );
 }
