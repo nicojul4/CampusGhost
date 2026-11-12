@@ -4,6 +4,14 @@ const path = require('path');
 const url = require('url');
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
+const MAX_REQUEST_BYTES = 1024 * 1024;
+const ALLOWED_ORIGINS = new Set(
+  (process.env.CORS_ORIGINS || 'http://localhost:8080,http://127.0.0.1:8080')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean),
+);
 const DB_FILE = path.join(__dirname, 'reports_db.json');
 
 // Helper to read DB
@@ -42,7 +50,7 @@ function readDatabase() {
     const raw = fs.readFileSync(DB_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (err) {
-    console.error('Error reading database file:', err);
+    console.error('Error reading database file. Check local database configuration.');
     return [];
   }
 }
@@ -53,7 +61,7 @@ function writeDatabase(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
     return true;
   } catch (err) {
-    console.error('Error writing database file:', err);
+    console.error('Error writing database file. Check local database configuration.');
     return false;
   }
 }
@@ -66,10 +74,23 @@ const server = http.createServer((req, res) => {
   const pathname = parsedUrl.pathname;
   const method = req.method;
 
-  // CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+
+  const origin = req.headers.origin;
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Origin tidak diizinkan.' }));
+    return;
+  }
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
 
   if (method === 'OPTIONS') {
     res.writeHead(204);
@@ -108,8 +129,20 @@ const server = http.createServer((req, res) => {
   // POST /api/reports
   if (pathname === '/api/reports' && method === 'POST') {
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let bodyTooLarge = false;
+    req.on('data', chunk => {
+      if (bodyTooLarge) return;
+      if (Buffer.byteLength(body) + chunk.length > MAX_REQUEST_BYTES) {
+        bodyTooLarge = true;
+        body = '';
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Ukuran request melebihi batas.' }));
+        return;
+      }
+      body += chunk;
+    });
     req.on('end', () => {
+      if (bodyTooLarge) return;
       try {
         const payload = JSON.parse(body || '{}');
 
@@ -159,6 +192,11 @@ const server = http.createServer((req, res) => {
 
   // Reset or clear endpoint for testing empty state
   if (pathname === '/api/reports/reset' && method === 'POST') {
+    if (process.env.NODE_ENV === 'production') {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Endpoint tidak ditemukan.' }));
+      return;
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify([], null, 2), 'utf8');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ message: 'Database reset to empty.' }));
@@ -170,8 +208,8 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'Endpoint tidak ditemukan.' }));
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[CampusGhost API Server] Running on http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`[CampusGhost API Server] Running on http://${HOST}:${PORT}`);
   console.log(`- GET  /api/reports`);
   console.log(`- POST /api/reports`);
   console.log(`- GET  /api/health`);
