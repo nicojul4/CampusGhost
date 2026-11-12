@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/report_model.dart';
 import '../repositories/report_repository.dart';
 import '../services/camera_photo_service.dart';
+import 'api_report_provider.dart';
 import 'auth_provider.dart';
 import 'firebase_provider.dart';
 
@@ -19,7 +20,10 @@ final activeUserIdProvider = Provider<String>((ref) {
 
 final reportRepositoryProvider = Provider<ReportRepository>((ref) =>
     ReportRepository(
-        ref.watch(localCampusStoreProvider), ref.watch(firebaseAuthProvider)));
+      ref.watch(localCampusStoreProvider),
+      ref.watch(firebaseAuthProvider),
+      firestoreService: ref.watch(firestoreReportServiceProvider),
+    ));
 final incidentReportsProvider =
     StreamProvider.family<List<ReportModel>, String>((ref, id) {
   final userId = ref.watch(activeUserIdProvider);

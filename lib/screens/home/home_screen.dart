@@ -66,60 +66,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   style: TextStyle(color: colors.onSurfaceVariant)),
               const SizedBox(height: 17),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: colors.secondaryContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF1E2B21)
+                      : const Color(0xFFE7F3EA),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xFF2E4633)
+                        : const Color(0xFFC8E3D0),
+                  ),
                 ),
                 child: Row(children: [
-                  Icon(Icons.cloud_done_rounded,
-                      color: colors.onSecondaryContainer, size: 19),
-                  const SizedBox(width: 9),
+                  const Icon(Icons.wifi_tethering_rounded,
+                      color: campusGreen, size: 20),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Terhubung ke Cloud Firestore: laporan disinkronkan langsung ke seluruh kampus secara real-time.',
+                      'Live Campus Monitoring: Laporan fasilitas tersinkronisasi otomatis untuk seluruh civitas kampus.',
                       style: TextStyle(
-                        color: colors.onSecondaryContainer,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? colors.onSurface
+                            : const Color(0xFF183B22),
                         fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         height: 1.35,
                       ),
                     ),
                   ),
                 ]),
-              ),
-              const SizedBox(height: 10),
-              InkWell(
-                onTap: () => Navigator.pushNamed(context, AppRoutes.apiReports),
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: colors.primaryContainer.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: colors.primary.withValues(alpha: 0.4)),
-                  ),
-                  child: Row(children: [
-                    Icon(Icons.cloud_sync_rounded, color: colors.primary, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Laporan Fasilitas Kampus (Real-Time)',
-                              style: TextStyle(
-                                  color: colors.primary,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 13)),
-                          const SizedBox(height: 2),
-                          Text('Daftar & pantau laporan fasilitas kampus dari Cloud Firestore',
-                              style: TextStyle(
-                                  color: colors.onSurfaceVariant, fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.arrow_forward_ios_rounded, size: 14, color: colors.primary),
-                  ]),
-                ),
               ),
               const SizedBox(height: 14),
               reports.when(

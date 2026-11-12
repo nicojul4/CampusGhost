@@ -3,7 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/notification_provider.dart';
 import 'report_photo_viewer.dart';
 
 const campusGreen = Color(0xFF0B6837);
@@ -25,6 +27,7 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value;
     final profilePhoto = ref.watch(profilePhotoProvider).asData?.value;
+    final unreadNotifs = ref.watch(unreadNotificationsCountProvider);
     final name = user?.displayName?.trim().isNotEmpty == true
         ? user!.displayName!.trim()
         : user?.email?.split('@').first ?? 'Mahasiswa';
@@ -59,10 +62,24 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
       ]),
       actions: [
         IconButton(
-            tooltip: 'Notifikasi',
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Belum ada notifikasi baru.'))),
-            icon: const Icon(Icons.notifications_none_rounded)),
+          tooltip: 'Notifikasi Kampus',
+          onPressed: () => _openNotificationsSheet(context),
+          icon: Badge(
+            isLabelVisible: unreadNotifs > 0,
+            label: Text(
+              '$unreadNotifs',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            child: Icon(
+              unreadNotifs > 0
+                  ? Icons.notifications_active_rounded
+                  : Icons.notifications_none_rounded,
+            ),
+          ),
+        ),
         IconButton(
           tooltip: 'Buka profil',
           onPressed: onProfile,
@@ -81,6 +98,279 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
         ),
       ],
     );
+  }
+
+  void _openNotificationsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => const _CampusNotificationsSheet(),
+    );
+  }
+}
+
+class _CampusNotificationsSheet extends ConsumerWidget {
+  const _CampusNotificationsSheet();
+
+  IconData _iconForCategory(String category) => switch (category.toLowerCase()) {
+        'wifi' => Icons.wifi_rounded,
+        'ac' => Icons.ac_unit_rounded,
+        'lift' => Icons.elevator_outlined,
+        'toilet' => Icons.wash_outlined,
+        'proyektor' => Icons.videocam_outlined,
+        'printer' => Icons.print_outlined,
+        'parkir' => Icons.local_parking_rounded,
+        _ => Icons.campaign_rounded,
+      };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifications = ref.watch(notificationsProvider);
+    final notifier = ref.read(notificationsProvider.notifier);
+    final colors = Theme.of(context).colorScheme;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colors.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.notifications_active_rounded,
+                        color: colors.primary, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Notifikasi Kampus',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                if (notifications.any((n) => !n.isRead))
+                  TextButton.icon(
+                    onPressed: () => notifier.markAllAsRead(),
+                    icon: const Icon(Icons.done_all_rounded, size: 16),
+                    label: const Text('Tandai dibaca',
+                        style: TextStyle(fontSize: 12)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pembaruan penanganan fasilitas oleh teknisi & satpam kampus',
+              style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            Expanded(
+              child: notifications.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.notifications_off_outlined,
+                              size: 48, color: colors.onSurfaceVariant),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Belum ada notifikasi baru.',
+                            style: TextStyle(color: colors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      itemCount: notifications.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final item = notifications[index];
+                        final icon = _iconForCategory(item.category);
+                        final isUnread = !item.isRead;
+
+                        final statusBadge = switch (item.type) {
+                          CampusNotificationType.inProgress => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: colors.tertiaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Sedang Dikerjakan',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.onTertiaryContainer,
+                                ),
+                              ),
+                            ),
+                          CampusNotificationType.resolved => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: colors.primaryContainer,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Selesai',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          CampusNotificationType.info => Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: colors.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Info',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                        };
+
+                        return InkWell(
+                          onTap: () => notifier.markAsRead(item.id),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isUnread
+                                  ? colors.primaryContainer
+                                      .withValues(alpha: 0.25)
+                                  : colors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isUnread
+                                    ? colors.primary.withValues(alpha: 0.3)
+                                    : colors.outlineVariant,
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: colors.primaryContainer,
+                                  child: Icon(icon,
+                                      color: colors.primary, size: 20),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              item.title,
+                                              style: TextStyle(
+                                                fontWeight: isUnread
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                                fontSize: 13,
+                                                color: colors.onSurface,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isUnread) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(
+                                                color: colors.primary,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item.message,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colors.onSurfaceVariant,
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          statusBadge,
+                                          Text(
+                                            _formatTime(item.createdAt),
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              color: colors.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inMinutes < 1) return 'Baru saja';
+    if (diff.inHours < 1) return '${diff.inMinutes} menit lalu';
+    if (diff.inDays < 1) return '${diff.inHours} jam lalu';
+    return '${diff.inDays} hari lalu';
   }
 }
 

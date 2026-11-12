@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/incident_model.dart';
-import '../../models/report_model.dart';
 import '../../config/routes.dart';
+import '../../models/incident_model.dart';
+import '../../models/notification_model.dart';
+import '../../models/report_model.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../repositories/report_repository.dart';
 import '../../widgets/campus_ui.dart';
@@ -76,6 +78,15 @@ class _IncidentDetailsState extends ConsumerState<_IncidentDetails> {
             category: incident.category,
           );
       if (!context.mounted) return;
+      if (result.state == ReportSubmissionState.processed) {
+        ref.read(notificationsProvider.notifier).addNotification(
+              title: 'Laporan Tambahan: ${incident.category}',
+              message:
+                  'Dukungan laporan Anda di ${incident.locationId} berhasil ditambahkan.',
+              category: incident.category,
+              type: CampusNotificationType.info,
+            );
+      }
       final message = switch (result.state) {
         ReportSubmissionState.duplicate =>
           'Anda baru saja melaporkan masalah ini.',

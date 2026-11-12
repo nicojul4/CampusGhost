@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../enums/report_category.dart';
+import '../../models/notification_model.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../repositories/report_repository.dart';
 import '../../services/camera_photo_service.dart';
@@ -469,6 +471,16 @@ class _CreateReportScreenState extends ConsumerState<CreateReportScreen> {
           );
 
       if (!mounted) return;
+
+      if (result.state == ReportSubmissionState.processed) {
+        ref.read(notificationsProvider.notifier).addNotification(
+              title: 'Laporan Baru: ${_category!.value} di $_locationId',
+              message:
+                  'Laporan kendala fasilitas Anda berhasil dicatat dan diteruskan ke tim teknisi/GA kampus.',
+              category: _category!.value,
+              type: CampusNotificationType.info,
+            );
+      }
 
       final message = switch (result.state) {
         ReportSubmissionState.duplicate =>

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../enums/report_status.dart';
 import '../models/report_model.dart';
+import '../services/firestore_report_service.dart';
 import '../services/local_campus_store.dart';
 import '../services/report_photo_codec.dart';
 
@@ -24,10 +25,15 @@ class RequiredReportPhotoException implements Exception {}
 class InvalidReportPhotoException implements Exception {}
 
 class ReportRepository {
-  ReportRepository(this._store, this._auth);
+  ReportRepository(
+    this._store,
+    this._auth, {
+    FirestoreReportService? firestoreService,
+  }) : _firestoreService = firestoreService;
 
   final LocalCampusStore _store;
   final FirebaseAuth _auth;
+  final FirestoreReportService? _firestoreService;
 
   String _currentUserId() => _auth.currentUser?.uid ?? 'guest_user';
 
@@ -156,6 +162,24 @@ class ReportRepository {
     if (locationDetail != null) record['LocationDetail'] = locationDetail;
     reports.add(record);
     await _store.saveReports(userId, reports);
+
+    if (_firestoreService != null) {
+      try {
+        await _firestoreService.createReport(
+          category: category,
+          locationId: locationId,
+          description: description,
+          userId: userId,
+          photoUrl: photoUrl,
+          latitude: latitude,
+          longitude: longitude,
+          locationDetail: locationDetail,
+        );
+      } catch (_) {
+        // Fallback aman: data tetap tersimpan persisten di LocalCampusStore
+      }
+    }
+
     return ReportSubmissionResult(
         ReportSubmissionState.processed, reportId, incidentId);
   }
