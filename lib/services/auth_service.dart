@@ -38,5 +38,15 @@ class AuthService {
     );
   }
 
+  Future<UserModel?> signInWithGoogle() async {
+    final user = await AuthRepository().signInWithGoogle();
+    return UserModel(
+      name: user.displayName ?? user.email?.split('@').first ?? 'Mahasiswa',
+      email: user.email ?? '',
+      studentId: '',
+      program: 'Mahasiswa',
+    );
+  }
+
   Future<void> signOut() => AuthRepository().signOut();
 }
