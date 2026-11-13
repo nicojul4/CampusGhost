@@ -231,6 +231,17 @@ class ReportRepository {
     existing['UpdatedAt'] = now.toIso8601String();
     reports[index] = existing;
     await _store.saveReports(userId, reports);
+
+    if (_firestoreService != null && status != null) {
+      try {
+        await _firestoreService.updateReportStatus(
+          reportId: reportId,
+          status: status,
+        );
+      } catch (_) {
+        // Fallback: penyimpanan lokal sudah diperbarui
+      }
+    }
   }
 
   Future<void> deleteReport(String reportId) async {

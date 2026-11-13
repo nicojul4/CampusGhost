@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../config/routes.dart';
 import '../../enums/facility_severity.dart';
 import '../../enums/report_category.dart';
+import '../../enums/user_role.dart';
 import '../../models/incident_model.dart';
 import '../../models/location_model.dart';
 import '../../providers/auth_provider.dart';
@@ -10,7 +12,7 @@ import '../../providers/firebase_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/report_provider.dart';
-import '../../config/routes.dart';
+import '../../providers/user_role_provider.dart';
 import '../../widgets/campus_ui.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -28,6 +30,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final incidents = ref.watch(incidentsProvider);
     final reports = ref.watch(reportsProvider);
     final locations = ref.watch(locationsProvider);
+    final role = ref.watch(userRoleProvider);
     final colors = Theme.of(context).colorScheme;
     final user = ref.watch(authStateProvider).asData?.value ??
         ref.watch(firebaseAuthProvider).currentUser;
@@ -64,6 +67,63 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 4),
               Text('Pantau kondisi fasilitas kampus hari ini.',
                   style: TextStyle(color: colors.onSurfaceVariant)),
+              if (role.isTechnician) ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2C220E), Color(0xFF1B2E24)],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.amber.shade700),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.engineering_rounded,
+                          color: Colors.amber, size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Panel Petugas GA & Satpam Aktif',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text(
+                              'Kelola tiket kendala fasilitas, mulai perbaikan atau tandai selesai.',
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.amber.shade700,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: () => Navigator.pushNamed(
+                            context, AppRoutes.technicianTickets),
+                        child: const Text('Buka Tiket',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 17),
               Container(
                 padding:
@@ -185,14 +245,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: 0,
         onDestinationSelected: (index) {
-          if (index == 1) Navigator.pushNamed(context, AppRoutes.profile);
+          if (role.isTechnician) {
+            if (index == 1) {
+              Navigator.pushNamed(context, AppRoutes.technicianTickets);
+            } else if (index == 2) {
+              Navigator.pushNamed(context, AppRoutes.profile);
+            }
+          } else {
+            if (index == 1) Navigator.pushNamed(context, AppRoutes.profile);
+          }
         },
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
-        ],
+        destinations: role.isTechnician
+            ? const [
+                NavigationDestination(
+                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                NavigationDestination(
+                    icon: Icon(Icons.engineering_rounded), label: 'Tiket GA'),
+                NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
+              ]
+            : const [
+                NavigationDestination(
+                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
+              ],
       ),
     );
   }

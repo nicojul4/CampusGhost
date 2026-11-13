@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../enums/user_role.dart';
 import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/notification_provider.dart';
+import '../providers/user_role_provider.dart';
 import 'report_photo_viewer.dart';
 
 const campusGreen = Color(0xFF0B6837);
@@ -61,6 +63,20 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
         ]),
       ]),
       actions: [
+        Consumer(
+          builder: (context, ref, _) {
+            final role = ref.watch(userRoleProvider);
+            final isTech = role.isTechnician;
+            return IconButton(
+              tooltip: 'Peran: ${role.label} (Klik untuk ganti)',
+              onPressed: () => _showRoleDialog(context, ref),
+              icon: Icon(
+                isTech ? Icons.engineering_rounded : Icons.school_outlined,
+                color: isTech ? Colors.amber : null,
+              ),
+            );
+          },
+        ),
         IconButton(
           tooltip: 'Notifikasi Kampus',
           onPressed: () => _openNotificationsSheet(context),
@@ -97,6 +113,55 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showRoleDialog(BuildContext context, WidgetRef ref) {
+    final currentRole = ref.read(userRoleProvider);
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Pilih Peran Pengguna'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              leading: const Icon(Icons.school_rounded, color: campusGreen),
+              title: const Text('Mahasiswa / Dosen'),
+              subtitle: const Text('Pelapor kendala fasilitas kampus'),
+              trailing: currentRole == UserRole.student
+                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
+                  : null,
+              onTap: () {
+                ref
+                    .read(userRoleProvider.notifier)
+                    .setRole(UserRole.student);
+                Navigator.pop(dialogCtx);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              leading:
+                  const Icon(Icons.engineering_rounded, color: Colors.amber),
+              title: const Text('Teknisi GA & Satpam'),
+              subtitle: const Text('Penerima tiket & penanganan perbaikan'),
+              trailing: currentRole == UserRole.technician
+                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
+                  : null,
+              onTap: () {
+                ref
+                    .read(userRoleProvider.notifier)
+                    .setRole(UserRole.technician);
+                Navigator.pop(dialogCtx);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

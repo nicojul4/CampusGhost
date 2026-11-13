@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../screens/home/home_screen.dart';
-import '../screens/report/create_report_screen.dart';
-import '../screens/report/api_reports_screen.dart';
-import '../screens/incident_detail/incident_detail_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
-import '../screens/profile/profile_screen.dart';
+import '../screens/home/home_screen.dart';
+import '../screens/incident_detail/incident_detail_screen.dart';
 import '../screens/profile/edit_profile_screen.dart';
+import '../screens/profile/profile_screen.dart';
+import '../screens/report/api_reports_screen.dart';
+import '../screens/report/create_report_screen.dart';
+import '../screens/technician/technician_tickets_screen.dart';
 import '../widgets/auth_gate.dart';
 
 class AppRoutes {
@@ -22,6 +23,7 @@ class AppRoutes {
   static const detail = '/detail';
   static const createReport = '/create-report';
   static const apiReports = '/api-reports';
+  static const technicianTickets = '/technician/tickets';
 
   static Map<String, WidgetBuilder> get routes => {
         root: (_) => const AuthGate(),
@@ -33,5 +35,7 @@ class AppRoutes {
         detail: (_) => const ProtectedRoute(child: IncidentDetailScreen()),
         createReport: (_) => const ProtectedRoute(child: CreateReportScreen()),
         apiReports: (_) => const ProtectedRoute(child: ApiReportsScreen()),
+        technicianTickets: (_) =>
+            const ProtectedRoute(child: TechnicianTicketsScreen()),
       };
 }

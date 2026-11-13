@@ -3,13 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/routes.dart';
 import '../../enums/report_status.dart';
+import '../../enums/user_role.dart';
 import '../../models/report_model.dart';
-import '../../services/auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/firebase_provider.dart';
 import '../../providers/incident_provider.dart';
-import '../../services/report_photo_codec.dart';
 import '../../providers/report_provider.dart';
+import '../../providers/user_role_provider.dart';
+import '../../services/auth_service.dart';
+import '../../services/report_photo_codec.dart';
 import '../../widgets/campus_ui.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/theme_mode_scope.dart';
@@ -94,6 +96,7 @@ class ProfileScreen extends ConsumerWidget {
         ref.watch(firebaseAuthProvider).currentUser;
     final profilePhoto = ref.watch(profilePhotoProvider).asData?.value;
     final reports = ref.watch(userReportsProvider);
+    final role = ref.watch(userRoleProvider);
     final colors = Theme.of(context).colorScheme;
     final themeMode = ThemeModeScope.of(context);
     final displayName = user?.displayName ?? 'Mahasiswa';
@@ -144,7 +147,7 @@ class ProfileScreen extends ConsumerWidget {
                       .titleLarge
                       ?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('Mahasiswa • CampusGhost',
+              Text('${role.label} • CampusGhost',
                   style: TextStyle(color: colors.onSurfaceVariant)),
               const SizedBox(height: 13),
               OutlinedButton.icon(
@@ -252,12 +255,29 @@ class ProfileScreen extends ConsumerWidget {
               borderRadius: BorderRadius.circular(17),
               side: BorderSide(color: colors.outline),
             ),
-            child: SwitchListTile(
-              value: themeMode.isDark,
-              onChanged: themeMode.onChanged,
-              title: const Text('Mode gelap'),
-              subtitle: const Text('Sesuaikan tampilan aplikasi'),
-              secondary: const Icon(Icons.dark_mode_outlined),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  value: themeMode.isDark,
+                  onChanged: themeMode.onChanged,
+                  title: const Text('Mode gelap'),
+                  subtitle: const Text('Sesuaikan tampilan aplikasi'),
+                  secondary: const Icon(Icons.dark_mode_outlined),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(
+                    role.isTechnician
+                        ? Icons.engineering_rounded
+                        : Icons.school_rounded,
+                    color: role.isTechnician ? Colors.amber : colors.primary,
+                  ),
+                  title: const Text('Peran Aplikasi'),
+                  subtitle: Text(role.label),
+                  trailing: const Icon(Icons.swap_horiz_rounded),
+                  onTap: () => _showRoleDialog(context, ref),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 19),
@@ -278,16 +298,83 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: 1,
+        selectedIndex: role.isTechnician ? 2 : 1,
         onDestinationSelected: (index) {
-          if (index == 0) Navigator.pop(context);
+          if (role.isTechnician) {
+            if (index == 0) {
+              Navigator.pop(context);
+            } else if (index == 1) {
+              Navigator.pushReplacementNamed(
+                  context, AppRoutes.technicianTickets);
+            }
+          } else {
+            if (index == 0) Navigator.pop(context);
+          }
         },
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
-        ],
+        destinations: role.isTechnician
+            ? const [
+                NavigationDestination(
+                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                NavigationDestination(
+                    icon: Icon(Icons.engineering_rounded), label: 'Tiket GA'),
+                NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
+              ]
+            : const [
+                NavigationDestination(
+                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
+              ],
+      ),
+    );
+  }
+
+  void _showRoleDialog(BuildContext context, WidgetRef ref) {
+    final currentRole = ref.read(userRoleProvider);
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Pilih Peran Pengguna'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              leading: const Icon(Icons.school_rounded, color: campusGreen),
+              title: const Text('Mahasiswa / Dosen'),
+              subtitle: const Text('Pelapor kendala fasilitas kampus'),
+              trailing: currentRole == UserRole.student
+                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
+                  : null,
+              onTap: () {
+                ref
+                    .read(userRoleProvider.notifier)
+                    .setRole(UserRole.student);
+                Navigator.pop(dialogCtx);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              leading:
+                  const Icon(Icons.engineering_rounded, color: Colors.amber),
+              title: const Text('Teknisi GA & Satpam'),
+              subtitle: const Text('Penerima tiket & penanganan perbaikan'),
+              trailing: currentRole == UserRole.technician
+                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
+                  : null,
+              onTap: () {
+                ref
+                    .read(userRoleProvider.notifier)
+                    .setRole(UserRole.technician);
+                Navigator.pop(dialogCtx);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

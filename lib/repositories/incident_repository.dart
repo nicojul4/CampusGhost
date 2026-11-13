@@ -13,13 +13,18 @@ class IncidentRepository {
     await for (final reports in _reportRepository.watchCurrentUser()) {
       final groups = <String, List<dynamic>>{};
       for (final report in reports) {
-        if (report.status != ReportStatus.active) continue;
+        if (report.status != ReportStatus.active &&
+            report.status != ReportStatus.inProgress) {
+          continue;
+        }
         final incidentId = report.incidentId;
         if (incidentId == null) continue;
         (groups[incidentId] ??= []).add(report);
       }
       yield groups.entries.map((entry) {
         final group = entry.value;
+        final anyInProgress =
+            group.any((r) => r.status == ReportStatus.inProgress);
         final newest = group
             .map((report) => report.createdAt)
             .whereType<DateTime>()
@@ -47,7 +52,8 @@ class IncidentRepository {
           locationId: group.first.locationId,
           category: category,
           reportCount: group.length,
-          status: IncidentStatus.active,
+          status:
+              anyInProgress ? IncidentStatus.inProgress : IncidentStatus.active,
           severity:
               score >= 3 ? FacilitySeverity.critical : FacilitySeverity.warning,
           firstReportedAt: first,

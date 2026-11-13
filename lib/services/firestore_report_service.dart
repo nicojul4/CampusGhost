@@ -106,6 +106,19 @@ class FirestoreReportService {
     );
   }
 
+  Future<void> updateReportStatus({
+    required String reportId,
+    required ReportStatus status,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await _reportsRef.doc(reportId).update({
+      'status': status.value,
+      'Status': status.value,
+      'updatedAt': now.toIso8601String(),
+      'UpdatedAt': now.toIso8601String(),
+    });
+  }
+
   Future<void> _seedInitialReports() async {
     try {
       final now = DateTime.now().toUtc();
