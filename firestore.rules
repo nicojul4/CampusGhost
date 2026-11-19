@@ -4,26 +4,60 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null;
     }
+    
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
 
     match /users/{userId} {
-      allow read: if signedIn() && request.auth.uid == userId;
-      allow create, update: if signedIn() && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId);
       allow delete: if false;
     }
 
     match /locations/{locationId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
 
     match /reports/{reportId} {
-      allow read: if true;
-      allow create: if true;
-      allow update, delete: if signedIn();
+      // Hanya user terautentikasi yang bisa membaca laporan
+      allow read: if signedIn();
+      
+      // Create: validasi user ID dan field yang diizinkan
+      allow create: if signedIn() 
+        && request.resource.data.keys().hasOnly([
+          'id', 'Id', 
+          'userId', 'UserId', 
+          'locationId', 'LocationId',
+          'category', 'Category',
+          'description', 'Description',
+          'photoUrl', 'PhotoUrl',
+          'status', 'Status',
+          'createdAt', 'CreatedAt',
+          'updatedAt', 'UpdatedAt',
+          'latitude', 'longitude', 'locationDetail'
+        ])
+        && (request.resource.data.userId == request.auth.uid 
+            || request.resource.data.UserId == request.auth.uid)
+        && request.resource.data.description is string
+        && request.resource.data.description.size() >= 10;
+      
+      // Update: hanya pemilik, tidak boleh ubah field identitas
+      allow update: if signedIn() 
+        && (resource.data.userId == request.auth.uid 
+            || resource.data.UserId == request.auth.uid)
+        && (!request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['id', 'Id', 'userId', 'UserId', 'createdAt', 'CreatedAt', 'IncidentId']));
+      
+      // Delete: hanya pemilik laporan
+      allow delete: if signedIn() 
+        && (resource.data.userId == request.auth.uid 
+            || resource.data.UserId == request.auth.uid);
     }
 
     match /incidents/{incidentId} {
-      allow read: if true;
+      allow read: if signedIn();
       allow write: if false;
     }
   }
