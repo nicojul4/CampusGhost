@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../enums/report_status.dart';
 import '../models/report_model.dart';
+import '../utils/logger.dart';
 
 class FirestoreReportService {
   FirestoreReportService({
@@ -29,10 +30,13 @@ class FirestoreReportService {
   }
 
   Future<List<ReportModel>> getReports() async {
+    logger.info('FirestoreReportService', 'Fetching reports from Firestore');
     QuerySnapshot<Map<String, dynamic>> snapshot;
     try {
       snapshot = await _reportsRef.get();
-    } catch (e) {
+      logger.info('FirestoreReportService', 'Successfully fetched ${snapshot.docs.length} reports');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('FirestoreReportService', 'Failed to fetch reports from Firestore', e, stackTrace);
       rethrow;
     }
 
@@ -57,6 +61,7 @@ class FirestoreReportService {
     double? longitude,
     String? locationDetail,
   }) async {
+    logger.info('FirestoreReportService', 'Creating report: location=$locationId, category=$category');
     final now = DateTime.now().toUtc();
     final uid = userId ?? _auth.currentUser?.uid ?? 'user_campus';
     final docRef = _reportsRef.doc();
@@ -87,7 +92,13 @@ class FirestoreReportService {
       if (locationDetail != null) 'locationDetail': locationDetail,
     };
 
-    await docRef.set(data);
+    try {
+      await docRef.set(data);
+      logger.info('FirestoreReportService', 'Report created successfully: ${docRef.id}');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('FirestoreReportService', 'Failed to create report in Firestore', e, stackTrace);
+      rethrow;
+    }
 
     return ReportModel(
       id: docRef.id,
@@ -110,13 +121,20 @@ class FirestoreReportService {
     required String reportId,
     required ReportStatus status,
   }) async {
+    logger.info('FirestoreReportService', 'Updating report $reportId status to ${status.value}');
     final now = DateTime.now().toUtc();
-    await _reportsRef.doc(reportId).update({
-      'status': status.value,
-      'Status': status.value,
-      'updatedAt': now.toIso8601String(),
-      'UpdatedAt': now.toIso8601String(),
-    });
+    try {
+      await _reportsRef.doc(reportId).update({
+        'status': status.value,
+        'Status': status.value,
+        'updatedAt': now.toIso8601String(),
+        'UpdatedAt': now.toIso8601String(),
+      });
+      logger.info('FirestoreReportService', 'Report status updated successfully');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('FirestoreReportService', 'Failed to update report status in Firestore', e, stackTrace);
+      rethrow;
+    }
   }
 
   Future<void> _seedInitialReports() async {

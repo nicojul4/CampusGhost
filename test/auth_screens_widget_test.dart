@@ -1,4 +1,3 @@
-import 'package:campus_ghost/config/routes.dart';
 import 'package:campus_ghost/screens/auth/login_screen.dart';
 import 'package:campus_ghost/screens/auth/register_screen.dart';
 import 'package:flutter/material.dart';

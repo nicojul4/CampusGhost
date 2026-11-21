@@ -1,64 +1,162 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ── helpers ──────────────────────────────────────────────────────────────
     function signedIn() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return signedIn() && request.auth.uid == userId;
     }
 
+    // ── users ─────────────────────────────────────────────────────────────────
+    // Privileged fields are NEVER writable by the client.
+    // All changes to role, isActive, roleVersion, provisioningStatus,
+    // deactivatedAt, deactivatedBy, and claimsOutOfSync go through
+    // Cloud Functions (Admin SDK) which bypass these rules.
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId);
+
+      // Create: client must own the document, declare role='student',
+      // isActive=true, and must not include any privileged field.
+      allow create: if isOwner(userId)
+        && request.resource.data.uid      == request.auth.uid
+        && request.resource.data.role     == 'student'
+        && request.resource.data.isActive == true
+        && !request.resource.data.keys().hasAny([
+             'roleVersion', 'provisioningStatus',
+             'deactivatedAt', 'deactivatedBy', 'claimsOutOfSync',
+             'operationId', 'transitionId', 'transitionStartedAt',
+             'transitionAttemptCount', 'pendingRole', 'pendingIsActive',
+             'pendingRoleVersion', 'roleTransitionStatus',
+             'intendedRole', 'intendedActive'
+           ]);
+
+      // Update: client may edit profile fields that are not privileged.
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny([
+               'uid', 'role', 'isActive',
+               'roleVersion', 'provisioningStatus',
+               'deactivatedAt', 'deactivatedBy', 'claimsOutOfSync',
+               'intendedRole', 'intendedActive',
+               'operationId', 'transitionId', 'transitionStartedAt',
+               'transitionAttemptCount', 'pendingRole', 'pendingIsActive',
+               'pendingRoleVersion', 'roleTransitionStatus'
+             ]);
+
       allow delete: if false;
     }
 
+    // ── locations ──────────────────────────────────────────────────────────
     match /locations/{locationId} {
-      allow read: if signedIn();
+      allow read:  if signedIn();
       allow write: if false;
     }
 
+    // ── reports ────────────────────────────────────────────────────────────
+    // Existing data uses both PascalCase (UserId, LocationId …) and camelCase
+    // (userId, locationId …) field names.  Both variants are covered below.
     match /reports/{reportId} {
-      // Hanya user terautentikasi yang bisa membaca laporan
-      allow read: if signedIn();
-      
-      // Create: validasi user ID dan field yang diizinkan
-      allow create: if signedIn() 
+      // Read: only the owner can read their own report.
+      allow read: if signedIn()
+        && (resource.data.userId == request.auth.uid
+            || resource.data.UserId == request.auth.uid);
+
+      // Create:
+      //   - Caller must supply EXACTLY one of userId / UserId and it must
+      //     match request.auth.uid.  Omitting both is rejected.
+      //   - If both are present they must agree AND equal the authenticated uid.
+      //   - status / Status may be supplied but must be 'Active'.
+      //   - Workflow-only fields (incidentId, assignedTo) must not be present.
+      allow create: if signedIn()
+
+        // Field allowlist — no other top-level keys permitted
         && request.resource.data.keys().hasOnly([
-          'id', 'Id', 
-          'userId', 'UserId', 
-          'locationId', 'LocationId',
-          'category', 'Category',
-          'description', 'Description',
-          'photoUrl', 'PhotoUrl',
-          'status', 'Status',
-          'createdAt', 'CreatedAt',
-          'updatedAt', 'UpdatedAt',
-          'latitude', 'longitude', 'locationDetail'
-        ])
-        && (request.resource.data.userId == request.auth.uid 
-            || request.resource.data.UserId == request.auth.uid)
+             'id', 'Id',
+             'userId', 'UserId',
+             'locationId', 'LocationId',
+             'category', 'Category',
+             'description', 'Description',
+             'photoUrl', 'PhotoUrl',
+             'status', 'Status',
+             'createdAt', 'CreatedAt',
+             'updatedAt', 'UpdatedAt',
+             'latitude', 'longitude', 'locationDetail'
+           ])
+
+        // At least one owner field must be present and correct
+        && (
+             (request.resource.data.keys().hasAny(['userId'])
+                && request.resource.data.userId == request.auth.uid)
+             ||
+             (request.resource.data.keys().hasAny(['UserId'])
+                && request.resource.data.UserId == request.auth.uid)
+           )
+
+        // If both casing variants present they must match each other
+        && (!request.resource.data.keys().hasAll(['userId', 'UserId'])
+            || request.resource.data.userId == request.resource.data.UserId)
+
+        // Workflow-only fields must be absent
+        && !request.resource.data.keys().hasAny([
+             'incidentId', 'IncidentId', 'assignedTo'
+           ])
+
+        // Description required and at least 10 chars
         && request.resource.data.description is string
-        && request.resource.data.description.size() >= 10;
-      
-      // Update: hanya pemilik, tidak boleh ubah field identitas
-      allow update: if signedIn() 
-        && (resource.data.userId == request.auth.uid 
+        && request.resource.data.description.size() >= 10
+
+        // Status, if supplied, must be Active
+        && (!request.resource.data.keys().hasAny(['status'])
+            || request.resource.data.status in ['Active', 'active'])
+        && (!request.resource.data.keys().hasAny(['Status'])
+            || request.resource.data.Status in ['Active', 'Active']);
+
+      // Update (owner only):
+      //   - Identity, timestamps, and workflow fields are immutable.
+      //   - Owners may update description, photo, location details only.
+      //   - status / Status changes are reserved for backend workflows.
+      allow update: if signedIn()
+        && (resource.data.userId == request.auth.uid
             || resource.data.UserId == request.auth.uid)
-        && (!request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['id', 'Id', 'userId', 'UserId', 'createdAt', 'CreatedAt', 'IncidentId']));
-      
-      // Delete: hanya pemilik laporan
-      allow delete: if signedIn() 
-        && (resource.data.userId == request.auth.uid 
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny([
+               'id', 'Id',
+               'userId', 'UserId',
+               'createdAt', 'CreatedAt',
+               'incidentId', 'IncidentId',
+               'status', 'Status',
+               'assignedTo'
+             ]);
+
+      // Delete: owner only
+      allow delete: if signedIn()
+        && (resource.data.userId == request.auth.uid
             || resource.data.UserId == request.auth.uid);
     }
 
+    // ── incidents ──────────────────────────────────────────────────────────
     match /incidents/{incidentId} {
-      allow read: if signedIn();
+      allow read:  if signedIn();
       allow write: if false;
+    }
+
+    // ── system control documents ───────────────────────────────────────────
+    // Only Cloud Functions (Admin SDK) may read or write these.
+    match /system/{document} {
+      allow read, write: if false;
+
+      match /{subcollection}/{item} {
+        allow read, write: if false;
+      }
+    }
+
+    // ── audit logs ─────────────────────────────────────────────────────────
+    match /audit_logs/{logId} {
+      allow read, write: if false;
     }
   }
 }

@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+
+import '../utils/logger.dart';
 
 enum LocationPermissionState {
   granted,
@@ -39,35 +40,41 @@ class LocationService {
 
   /// Memeriksa status izin lokasi saat ini
   Future<LocationPermissionState> checkPermission() async {
+    logger.debug('LocationService', 'checkPermission called');
     try {
       final isServiceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isServiceEnabled) {
+        logger.debug('LocationService', 'GPS service disabled');
         return LocationPermissionState.serviceDisabled;
       }
       final permission = await Geolocator.checkPermission();
+      logger.debug('LocationService', 'Permission status: $permission');
       return _mapPermission(permission);
-    } catch (e) {
-      debugPrint('LocationService checkPermission error: $e');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('LocationService', 'Error in checkPermission', e, stackTrace);
       return LocationPermissionState.unavailable;
     }
   }
 
   /// Meminta izin akses lokasi kepada pengguna
   Future<LocationPermissionState> requestPermission() async {
+    logger.debug('LocationService', 'requestPermission called');
     try {
       final isServiceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!isServiceEnabled) {
+        logger.debug('LocationService', 'GPS service disabled');
         return LocationPermissionState.serviceDisabled;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        logger.debug('LocationService', 'Permission denied, requesting');
         permission = await Geolocator.requestPermission();
       }
-
+      logger.debug('LocationService', 'Permission request result: $permission');
       return _mapPermission(permission);
-    } catch (e) {
-      debugPrint('LocationService requestPermission error: $e');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('LocationService', 'Error in requestPermission', e, stackTrace);
       return LocationPermissionState.unavailable;
     }
   }
@@ -76,12 +83,15 @@ class LocationService {
   Future<CampusCoordinates?> getCurrentCoordinates({
     Duration timeout = const Duration(seconds: 10),
   }) async {
+    logger.debug('LocationService', 'getCurrentCoordinates called');
     try {
       final permissionState = await requestPermission();
       if (permissionState != LocationPermissionState.granted) {
+        logger.debug('LocationService', 'Permission not granted, cannot get coordinates');
         return null;
       }
 
+      logger.debug('LocationService', 'Getting current position');
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -90,6 +100,7 @@ class LocationService {
       );
 
       final building = matchCampusBuilding(position.latitude, position.longitude);
+      logger.info('LocationService', 'Coordinates retrieved: $building (coordinates masked)');
 
       return CampusCoordinates(
         latitude: position.latitude,
@@ -98,10 +109,11 @@ class LocationService {
         campusBuilding: building,
         timestamp: position.timestamp,
       );
-    } catch (e) {
-      debugPrint('LocationService getCurrentCoordinates error: $e');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('LocationService', 'Error in getCurrentCoordinates', e, stackTrace);
       // Coba ambil last known position jika timeout atau gagal
       try {
+        logger.debug('LocationService', 'Trying last known position');
         final lastKnown = await Geolocator.getLastKnownPosition();
         if (lastKnown != null) {
           return CampusCoordinates(
@@ -113,6 +125,7 @@ class LocationService {
           );
         }
       } catch (_) {}
+      logger.debug('LocationService', 'No last known position available');
       return null;
     }
   }

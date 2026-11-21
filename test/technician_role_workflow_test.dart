@@ -9,7 +9,6 @@ import 'package:campus_ghost/models/report_model.dart';
 import 'package:campus_ghost/providers/notification_provider.dart';
 import 'package:campus_ghost/providers/report_provider.dart';
 import 'package:campus_ghost/providers/technician_tickets_provider.dart';
-import 'package:campus_ghost/providers/user_role_provider.dart';
 import 'package:campus_ghost/repositories/report_repository.dart';
 
 class FakeReportRepository extends Fake implements ReportRepository {
@@ -33,20 +32,31 @@ class FakeReportRepository extends Fake implements ReportRepository {
 
 void main() {
   group('Role-Based Panel & Technician Workflow Tests', () {
-    test('UserRole defaults to student and toggles to technician', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
-
-      expect(container.read(userRoleProvider), equals(UserRole.student));
-      expect(container.read(userRoleProvider).isStudent, isTrue);
-      expect(container.read(userRoleProvider).isTechnician, isFalse);
-
-      container.read(userRoleProvider.notifier).toggleRole();
-      expect(container.read(userRoleProvider), equals(UserRole.technician));
-      expect(container.read(userRoleProvider).isTechnician, isTrue);
-
-      container.read(userRoleProvider.notifier).setRole(UserRole.student);
-      expect(container.read(userRoleProvider), equals(UserRole.student));
+    test('UserRole enum has correct properties', () {
+      expect(UserRole.student.isStudent, isTrue);
+      expect(UserRole.student.isTechnician, isFalse);
+      expect(UserRole.student.isAdmin, isFalse);
+      
+      expect(UserRole.technician.isStudent, isFalse);
+      expect(UserRole.technician.isTechnician, isTrue);
+      expect(UserRole.technician.isAdmin, isFalse);
+      
+      expect(UserRole.admin.isStudent, isFalse);
+      expect(UserRole.admin.isTechnician, isFalse);
+      expect(UserRole.admin.isAdmin, isTrue);
+      
+      // Test fromString parsing
+      expect(UserRole.fromString('student'), equals(UserRole.student));
+      expect(UserRole.fromString('technician'), equals(UserRole.technician));
+      expect(UserRole.fromString('admin'), equals(UserRole.admin));
+      
+      // Test that invalid role throws
+      expect(() => UserRole.fromString('invalid'), throwsArgumentError);
+      
+      // Test toClaimValue
+      expect(UserRole.student.toClaimValue(), equals('student'));
+      expect(UserRole.technician.toClaimValue(), equals('technician'));
+      expect(UserRole.admin.toClaimValue(), equals('admin'));
     });
 
     test('ReportStatus & IncidentStatus parse inProgress and labels correctly', () {

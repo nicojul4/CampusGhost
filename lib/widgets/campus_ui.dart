@@ -134,12 +134,7 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
               trailing: currentRole == UserRole.student
                   ? const Icon(Icons.check_circle_rounded, color: campusGreen)
                   : null,
-              onTap: () {
-                ref
-                    .read(userRoleProvider.notifier)
-                    .setRole(UserRole.student);
-                Navigator.pop(dialogCtx);
-              },
+              enabled: currentRole == UserRole.student,
             ),
             const Divider(),
             ListTile(
@@ -152,12 +147,20 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
               trailing: currentRole == UserRole.technician
                   ? const Icon(Icons.check_circle_rounded, color: campusGreen)
                   : null,
-              onTap: () {
-                ref
-                    .read(userRoleProvider.notifier)
-                    .setRole(UserRole.technician);
-                Navigator.pop(dialogCtx);
-              },
+              enabled: currentRole == UserRole.technician,
+            ),
+            const Divider(),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              leading:
+                  const Icon(Icons.admin_panel_settings_rounded, color: Colors.red),
+              title: const Text('Administrator'),
+              subtitle: const Text('Pengelola sistem & penugasan'),
+              trailing: currentRole == UserRole.admin
+                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
+                  : null,
+              enabled: currentRole == UserRole.admin,
             ),
           ],
         ),

@@ -2,9 +2,12 @@
   "name": "campus-ghost-functions",
   "private": true,
   "main": "lib/index.js",
-  "engines": { "node": "22" },
+  "engines": {
+    "node": "22"
+  },
   "scripts": {
     "build": "tsc",
+    "test": "mocha",
     "seed:locations": "node scripts/seed_locations.mjs"
   },
   "dependencies": {
@@ -12,6 +15,15 @@
     "firebase-functions": "^6.0.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/sinon": "^22.0.2",
+    "chai": "^4.5.0",
+    "firebase-functions-test": "^3.5.0",
+    "mocha": "^10.8.2",
+    "sinon": "^22.1.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.0"
   }
 }

@@ -47,8 +47,8 @@ class LocalCampusStore {
     _changes.add(null);
   }
 
-  Future<void> updateReport(
-      String userId, String reportId, Map<String, dynamic> updatedRecord) async {
+  Future<void> updateReport(String userId, String reportId,
+      Map<String, dynamic> updatedRecord) async {
     final reports = await readReports(userId);
     final index = reports.indexWhere((r) => r['Id'] == reportId);
     if (index != -1) {

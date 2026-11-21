@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/routes.dart';
 import '../../enums/facility_severity.dart';
 import '../../enums/report_category.dart';
-import '../../enums/user_role.dart';
 import '../../models/incident_model.dart';
 import '../../models/location_model.dart';
 import '../../providers/auth_provider.dart';

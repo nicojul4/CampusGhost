@@ -7,6 +7,7 @@ import '../models/report_model.dart';
 import '../services/firestore_report_service.dart';
 import '../services/local_campus_store.dart';
 import '../services/report_photo_codec.dart';
+import '../utils/logger.dart';
 
 enum ReportSubmissionState { processed, duplicate, processing }
 
@@ -135,12 +136,40 @@ class ReportRepository {
       throw LocalPhotoStorageLimitException();
     }
 
-    final activeIncident = reports.where((report) =>
-        report['LocationId'] == locationId &&
-        report['Category'] == category &&
-        DateTime.tryParse(report['CreatedAt'] as String? ?? '')
-                ?.isAfter(now.subtract(const Duration(hours: 24))) ==
-            true);
+    final activeIncident = reports.where((report) {
+      // Validasi field wajib untuk grouping
+      if (report['LocationId'] != locationId) {
+        return false;
+      }
+      if (report['Category'] != category) {
+        return false;
+      }
+
+      // Validasi CreatedAt
+      final createdAtStr = report['CreatedAt'] as String?;
+      final createdAt =
+          createdAtStr != null ? DateTime.tryParse(createdAtStr) : null;
+      if (createdAt == null) {
+        return false;
+      }
+      if (!createdAt.isAfter(now.subtract(const Duration(hours: 24)))) {
+        return false;
+      }
+
+      // Validasi IncidentId: harus tersedia dan valid untuk grouping
+      final incidentIdRaw = report['IncidentId'];
+      if (incidentIdRaw == null) {
+        return false;
+      }
+      if (incidentIdRaw is! String) {
+        return false;
+      }
+      if (incidentIdRaw.trim().isEmpty) {
+        return false;
+      }
+
+      return true;
+    });
     final incidentId = activeIncident.isEmpty
         ? _newId(now)
         : activeIncident.first['IncidentId'] as String;
@@ -165,6 +194,8 @@ class ReportRepository {
 
     if (_firestoreService != null) {
       try {
+        logger.info('ReportRepository',
+            'Creating report in Firestore for location: $locationId, category: $category');
         await _firestoreService.createReport(
           category: category,
           locationId: locationId,
@@ -175,7 +206,11 @@ class ReportRepository {
           longitude: longitude,
           locationDetail: locationDetail,
         );
-      } catch (_) {
+        logger.info(
+            'ReportRepository', 'Report created in Firestore successfully');
+      } catch (e, stackTrace) {
+        logger.errorWithStack('ReportRepository',
+            'Failed to create report in Firestore', e, stackTrace);
         // Fallback aman: data tetap tersimpan persisten di LocalCampusStore
       }
     }
@@ -234,11 +269,16 @@ class ReportRepository {
 
     if (_firestoreService != null && status != null) {
       try {
+        logger.info('ReportRepository',
+            'Updating report status in Firestore: $reportId to ${status.value}');
         await _firestoreService.updateReportStatus(
           reportId: reportId,
           status: status,
         );
-      } catch (_) {
+        logger.info('ReportRepository', 'Report status updated successfully');
+      } catch (e, stackTrace) {
+        logger.errorWithStack('ReportRepository',
+            'Failed to update report status in Firestore', e, stackTrace);
         // Fallback: penyimpanan lokal sudah diperbarui
       }
     }
@@ -255,23 +295,48 @@ class ReportRepository {
   ReportModel _toModel(
       Map<String, dynamic> value, List<Map<String, dynamic>> allReports) {
     final createdAt = DateTime.tryParse(value['CreatedAt'] as String? ?? '');
-    final incidentId = value['IncidentId'];
-    final incidentReports = allReports.where(
-        (report) => report['IncidentId'] == incidentId && incidentId != null);
-    final lastReportAt = incidentReports
-        .map(
-            (report) => DateTime.tryParse(report['CreatedAt'] as String? ?? ''))
-        .whereType<DateTime>()
-        .fold<DateTime?>(
-            null,
-            (latest, date) =>
-                latest == null || date.isAfter(latest) ? date : latest);
-    final explicitlyResolved =
-        value['Status'] == ReportStatus.resolved.value;
+
+    // Validasi IncidentId sebelum digunakan untuk grouping
+    final incidentIdRaw = value['IncidentId'];
+    String? incidentId;
+    if (incidentIdRaw != null &&
+        incidentIdRaw is String &&
+        incidentIdRaw.trim().isNotEmpty) {
+      incidentId = incidentIdRaw;
+    }
+
+    // Hitung lastReportAt hanya jika incidentId valid
+    DateTime? lastReportAt;
+    if (incidentId != null) {
+      final incidentReports = allReports.where((report) {
+        final rIncidentId = report['IncidentId'];
+        if (rIncidentId == null ||
+            rIncidentId is! String ||
+            rIncidentId.trim().isEmpty) {
+          return false;
+        }
+        return rIncidentId == incidentId;
+      });
+
+      lastReportAt = incidentReports
+          .map((report) {
+            final rCreatedAt = report['CreatedAt'] as String?;
+            return rCreatedAt != null ? DateTime.tryParse(rCreatedAt) : null;
+          })
+          .whereType<DateTime>()
+          .fold<DateTime?>(
+              null,
+              (latest, date) =>
+                  latest == null || date.isAfter(latest) ? date : latest);
+    }
+
+    final explicitlyResolved = value['Status'] == ReportStatus.resolved.value;
     final autoResolved = lastReportAt != null &&
-        lastReportAt.isBefore(DateTime.now().toUtc().subtract(
-              const Duration(hours: 24),
-            ));
+        lastReportAt.isBefore(
+          DateTime.now().toUtc().subtract(
+                const Duration(hours: 24),
+              ),
+        );
     final resolved = explicitlyResolved || autoResolved;
     final latRaw = value['Latitude'];
     final lngRaw = value['Longitude'];
@@ -283,7 +348,7 @@ class ReportRepository {
       description: value['Description'] as String? ?? '',
       photoUrl: value['PhotoUrl'] as String?,
       status: resolved ? ReportStatus.resolved : ReportStatus.active,
-      incidentId: value['IncidentId'] as String?,
+      incidentId: incidentId,
       createdAt: createdAt,
       updatedAt: DateTime.tryParse(value['UpdatedAt'] as String? ?? ''),
       latitude: latRaw is num ? latRaw.toDouble() : null,

@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'report_photo_codec.dart';
+import '../utils/logger.dart';
 
 class PhotoPickResult {
   const PhotoPickResult({
@@ -38,11 +38,13 @@ class CameraPhotoService {
     required PhotoSource source,
     int maxBytes = maxReportPhotoBytes,
   }) async {
+    logger.debug('CameraPhotoService', 'pickPhoto called: source=$source, maxBytes=$maxBytes');
     try {
       final imageSource = source == PhotoSource.camera
           ? ImageSource.camera
           : ImageSource.gallery;
 
+      logger.debug('CameraPhotoService', 'Pick image from $imageSource');
       final XFile? pickedFile = await _picker.pickImage(
         source: imageSource,
         maxWidth: 1600,
@@ -52,9 +54,11 @@ class CameraPhotoService {
 
       // User membatalkan pengambilan gambar
       if (pickedFile == null) {
+        logger.debug('CameraPhotoService', 'User cancelled photo pick');
         return null;
       }
 
+      logger.debug('CameraPhotoService', 'Image picked: ${pickedFile.name}, size: ${pickedFile.length} bytes');
       final bytes = await pickedFile.readAsBytes();
 
       if (bytes.length > maxBytes) {
@@ -81,13 +85,13 @@ class CameraPhotoService {
     } on UnsupportedPhotoFormatException {
       rethrow;
     } on PlatformException catch (e) {
+      logger.error('CameraPhotoService', 'Platform error: ${e.code} - ${e.message}', e);
       if (e.code == 'camera_access_denied') {
         throw const PhotoPermissionDeniedException();
       }
-      debugPrint('CameraPhotoService pickPhoto error: $e');
       throw PhotoCaptureException('Gagal mengambil foto: $e');
-    } catch (e) {
-      debugPrint('CameraPhotoService pickPhoto error: $e');
+    } catch (e, stackTrace) {
+      logger.errorWithStack('CameraPhotoService', 'Unexpected error in pickPhoto', e, stackTrace);
       throw PhotoCaptureException('Gagal mengambil foto: $e');
     }
   }
