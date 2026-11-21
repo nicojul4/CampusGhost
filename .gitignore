@@ -32,6 +32,11 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+
+# Local environment files (keep the redacted template tracked)
+.env
+.env.*
+!.env.example
 /functions/node_modules/
 /functions/lib/
 
