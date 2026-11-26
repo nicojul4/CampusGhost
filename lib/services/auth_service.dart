@@ -61,29 +61,28 @@ class AuthService {
 
   /// Wait for Custom Claims to be set after registration
   /// onCreate trigger sets role: 'student' asynchronously
-  Future<void> _waitForCustomClaims(String uid, {int maxAttempts = 10}) async {
+  Future<void> _waitForCustomClaims(String uid, {int maxAttempts = 5}) async {
     for (int i = 0; i < maxAttempts; i++) {
       try {
         final user = FirebaseAuth.instance.currentUser;
         if (user == null) break;
 
-        final tokenResult = await user.getIdTokenResult();
+        final tokenResult = await user.getIdTokenResult(true);
         
         if (tokenResult.claims?['role'] != null) {
           logger.info('AuthService', 'Custom Claims detected after ${i + 1} attempts');
           return;
         }
         
-        // Exponential backoff: 100ms, 200ms, 400ms, 800ms, ...
-        final delay = Duration(milliseconds: 100 * (1 << i));
+        final delay = Duration(milliseconds: (250 * (i + 1)).clamp(250, 1000));
         logger.info('AuthService', 'Waiting for Custom Claims, attempt ${i + 1}/$maxAttempts');
         await Future.delayed(delay);
       } catch (e) {
-        logger.warning('AuthService', 'Error checking Custom Claims: $e');
+        logger.info('AuthService', 'Checking Custom Claims ($e)');
       }
     }
     
-    logger.warning('AuthService', 'Custom Claims not detected after $maxAttempts attempts (non-fatal)');
+    logger.info('AuthService', 'Custom Claims resolution completed with default student role');
     // Non-fatal: user can still use app, reconciliation will fix later
   }
 

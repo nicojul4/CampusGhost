@@ -8,6 +8,7 @@ import '../screens/profile/edit_profile_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/report/api_reports_screen.dart';
 import '../screens/report/create_report_screen.dart';
+import '../screens/splash/splash_screen.dart';
 import '../screens/technician/technician_tickets_screen.dart';
 import '../widgets/auth_gate.dart';
 
@@ -15,6 +16,7 @@ class AppRoutes {
   AppRoutes._();
 
   static const root = '/';
+  static const splash = '/splash';
   static const login = '/login';
   static const register = '/register';
   static const dashboard = '/dashboard';
@@ -26,7 +28,8 @@ class AppRoutes {
   static const technicianTickets = '/technician/tickets';
 
   static Map<String, WidgetBuilder> get routes => {
-        root: (_) => const AuthGate(),
+        root: (_) => const SplashScreen(),
+        splash: (_) => const SplashScreen(),
         login: (_) => const LoginScreen(),
         register: (_) => const RegisterScreen(),
         dashboard: (_) => const ProtectedRoute(child: DashboardScreen()),

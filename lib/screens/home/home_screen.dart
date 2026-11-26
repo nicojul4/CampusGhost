@@ -23,6 +23,111 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _filter = 'Semua';
+  bool _welcomeToastShown = false;
+
+  String _getTimeGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 4 && hour < 11) {
+      return 'Selamat Pagi';
+    } else if (hour >= 11 && hour < 15) {
+      return 'Selamat Siang';
+    } else if (hour >= 15 && hour < 18) {
+      return 'Selamat Sore';
+    } else {
+      return 'Selamat Malam';
+    }
+  }
+
+  String _getTimeEmoji() {
+    final hour = DateTime.now().hour;
+    if (hour >= 4 && hour < 11) {
+      return '☀️';
+    } else if (hour >= 11 && hour < 15) {
+      return '🌤️';
+    } else if (hour >= 15 && hour < 18) {
+      return '🌇';
+    } else {
+      return '🌙';
+    }
+  }
+
+  void _showCleanWelcomeToast(String name, bool isDark) {
+    if (_welcomeToastShown) return;
+    _welcomeToastShown = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          content: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1B2E21) : const Color(0xFF0B6837),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+              border: Border.all(
+                color: isDark ? const Color(0xFF2E4633) : const Color(0xFF1B8A4D),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.waving_hand_rounded,
+                    color: Colors.amber,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Selamat Datang, $name!',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Pantau dan laporkan kondisi fasilitas kampus dengan mudah.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +136,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final locations = ref.watch(locationsProvider);
     final role = ref.watch(userRoleProvider);
     final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.watch(authStateProvider).asData?.value ??
         ref.watch(firebaseAuthProvider).currentUser;
     final name = user?.displayName?.split(' ').first ??
         user?.email?.split('@').first ??
         'Mahasiswa';
+
+    _showCleanWelcomeToast(name, isDark);
 
     return Scaffold(
       appBar: CampusHeader(
@@ -56,9 +164,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   .where((incident) => incident.category == _filter)
                   .toList();
           return ListView(
+            cacheExtent: 400,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
             children: [
-              Text('Halo, $name! 👋',
+              Text('Halo, ${_getTimeGreeting()}, $name! ${_getTimeEmoji()}',
                   style: TextStyle(
                       color: colors.primary,
                       fontSize: 23,

@@ -21,7 +21,6 @@ import {
 import type {RulesTestEnvironment} from '@firebase/rules-unit-testing';
 import {readFileSync}  from 'fs';
 import {resolve}       from 'path';
-import {expect}        from 'chai';
 
 const EMULATOR_HOST = process.env['FIRESTORE_EMULATOR_HOST'];
 const SKIP = !EMULATOR_HOST;

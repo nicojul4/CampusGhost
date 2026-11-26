@@ -17,6 +17,16 @@ class NotificationsNotifier extends Notifier<List<CampusNotification>> {
     final now = DateTime.now();
     return [
       CampusNotification(
+        id: 'notif-welcome',
+        title: 'Selamat Datang di CampusGhost!',
+        message:
+            'Pantau kendala dan laporkan fasilitas kampus Pradita University dengan cepat dan mudah.',
+        category: 'Kampus',
+        createdAt: now,
+        isRead: false,
+        type: CampusNotificationType.info,
+      ),
+      CampusNotification(
         id: 'notif-1',
         title: 'AC Gedung 2 Ruang 202 Sedang Diperbaiki',
         message:

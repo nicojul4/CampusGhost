@@ -14,6 +14,7 @@ import '../../services/auth_service.dart';
 import '../../services/report_photo_codec.dart';
 import '../../widgets/campus_ui.dart';
 import '../../widgets/primary_button.dart';
+import '../../widgets/system_log_viewer_modal.dart';
 import '../../widgets/theme_mode_scope.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -112,6 +113,7 @@ class ProfileScreen extends ConsumerWidget {
             const Text('Profil', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: ListView(
+        cacheExtent: 400,
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
         children: [
           Container(
@@ -276,6 +278,14 @@ class ProfileScreen extends ConsumerWidget {
                   subtitle: Text(role.label),
                   trailing: const Icon(Icons.swap_horiz_rounded),
                   onTap: () => _showRoleDialog(context, ref),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.terminal_rounded, color: Colors.teal),
+                  title: const Text('Log Sistem & Tracing'),
+                  subtitle: const Text('Lihat riwayat log saat aplikasi berjalan'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => SystemLogViewerModal.show(context),
                 ),
               ],
             ),

@@ -15,11 +15,15 @@ class CampusGhostApp extends StatefulWidget {
 class _CampusGhostAppState extends State<CampusGhostApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
+  // Cache ThemeData agar tidak dibangun ulang terus menerus saat rebuild (optimasi 60/120fps)
+  late final ThemeData _lightTheme = _buildTheme(Brightness.light);
+  late final ThemeData _darkTheme = _buildTheme(Brightness.dark);
+
   void _toggleTheme(bool isDark) => setState(
         () => _themeMode = isDark ? ThemeMode.dark : ThemeMode.light,
       );
 
-  ThemeData _theme(Brightness brightness) {
+  ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
     final surface = isDark ? const Color(0xFF121713) : const Color(0xFFF7FAF5);
     final card = isDark ? const Color(0xFF1C241E) : Colors.white;
@@ -34,6 +38,7 @@ class _CampusGhostAppState extends State<CampusGhostApp> {
           isDark ? const Color(0xFFBAC6BC) : const Color(0xFF657168),
       outline: line,
     );
+
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -41,6 +46,16 @@ class _CampusGhostAppState extends State<CampusGhostApp> {
       scaffoldBackgroundColor: surface,
       cardColor: card,
       dividerColor: line,
+      splashFactory: InkSparkle.splashFactory, // Animasi sentuhan GPU hardware-accelerated
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: surface,
         foregroundColor: scheme.onSurface,
@@ -70,9 +85,14 @@ class _CampusGhostAppState extends State<CampusGhostApp> {
   Widget build(BuildContext context) => MaterialApp(
         title: 'CampusGhost',
         debugShowCheckedModeBanner: false,
-        theme: _theme(Brightness.light),
-        darkTheme: _theme(Brightness.dark),
+        theme: _lightTheme,
+        darkTheme: _darkTheme,
         themeMode: _themeMode,
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+        ),
         builder: (context, child) => ThemeModeScope(
           isDark: _themeMode == ThemeMode.dark,
           onChanged: _toggleTheme,

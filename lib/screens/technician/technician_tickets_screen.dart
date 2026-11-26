@@ -7,6 +7,7 @@ import '../../models/report_model.dart';
 import '../../providers/technician_tickets_provider.dart';
 import '../../providers/user_role_provider.dart';
 import '../../services/report_photo_codec.dart';
+import '../../widgets/system_log_viewer_modal.dart';
 
 const campusGreen = Color(0xFF0B6837);
 
@@ -62,6 +63,11 @@ class _TechnicianTicketsScreenState
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Log Sistem & Tracing',
+            icon: const Icon(Icons.terminal_rounded),
+            onPressed: () => SystemLogViewerModal.show(context),
+          ),
           IconButton(
             tooltip: 'Ganti Peran Pengguna',
             icon: const Icon(Icons.swap_horiz_rounded),
@@ -120,6 +126,7 @@ class _TechnicianTicketsScreenState
           }).toList();
 
           return ListView(
+            cacheExtent: 400,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
               // Switch Role Banner

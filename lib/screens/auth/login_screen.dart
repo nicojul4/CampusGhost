@@ -116,12 +116,33 @@ class _LoginScreenState extends State<LoginScreen> {
               constraints: const BoxConstraints(maxWidth: 460),
               child: Column(
                 children: [
-                  Image.asset(
-                    'image/LOGO-PRADITA-removebg-preview.png',
-                    width: 200,
-                    height: 86,
-                    fit: BoxFit.contain,
-                    semanticLabel: 'Logo Pradita University',
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          'web/icons/Ghost Campus Map Pin Icon.png',
+                          width: 44,
+                          height: 44,
+                          cacheWidth: 120,
+                          cacheHeight: 120,
+                          filterQuality: FilterQuality.medium,
+                          fit: BoxFit.cover,
+                          semanticLabel: 'Logo CampusGhost',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Image.asset(
+                        'image/LOGO-PRADITA-removebg-preview.png',
+                        width: 170,
+                        height: 72,
+                        cacheWidth: 380,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.medium,
+                        semanticLabel: 'Logo Pradita University',
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   Container(
