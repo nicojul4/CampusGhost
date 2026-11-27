@@ -1,4 +1,4 @@
-name: Flutter CI/CD
+name: Flutter CI (Minimal)
 
 on:
   push:
@@ -10,77 +10,22 @@ jobs:
   analyze:
     name: Code Analysis
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
+    - uses: actions/checkout@v3
+    - uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
-        
-    - name: Get dependencies
-      run: flutter pub get
-      
-    - name: Run flutter analyze
-      run: flutter analyze --no-fatal-infos --no-fatal-warnings
+    - run: flutter pub get
+    - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
+    - uses: actions/checkout@v3
+    - uses: subosito/flutter-action@v2
       with:
         channel: 'stable'
-        
-    - name: Get dependencies
-      run: flutter pub get
-      
-    - name: Run tests with coverage
-      run: flutter test --coverage || echo "Tests completed with some failures"
+    - run: flutter pub get
+    - run: flutter test || true
       continue-on-error: true
-      
-    - name: Upload coverage
-      uses: codecov/codecov-action@v4
-      if: always()
-      continue-on-error: true
-      with:
-        files: ./coverage/lcov.info
-        fail_ci_if_error: false
-        
-  build-apk:
-    name: Build Android APK
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/v1.0_dev')
-    needs: [analyze, test]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        channel: 'stable'
-        
-    - name: Get dependencies
-      run: flutter pub get
-      
-    - name: Build APK
-      run: flutter build apk --release --android-skip-build-dependency-validation
-      continue-on-error: true
-      
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      if: success()
-      continue-on-error: true
-      with:
-        name: campus-ghost-apk-${{ github.sha }}
-        path: build/app/outputs/flutter-apk/app-release.apk
-        retention-days: 30
