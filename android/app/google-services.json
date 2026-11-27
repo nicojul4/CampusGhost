@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "140322333839",
+    "project_id": "campusghost-adita",
+    "storage_bucket": "campusghost-adita.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:140322333839:android:db5f9d3129359745ecbcfa",
+        "android_client_info": {
+          "package_name": "com.example.campus_ghost"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "140322333839-uoal7bhh2iih72spacgltbl453vgc9re.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBf8UoXL59hGxqVk6075E3z4Ng3x6mbr1s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "140322333839-uoal7bhh2iih72spacgltbl453vgc9re.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
