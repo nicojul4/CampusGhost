@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/firebase_provider.dart';
 import '../../providers/incident_provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/report_provider.dart';
 import '../../providers/user_role_provider.dart';
 import '../../widgets/campus_ui.dart';
@@ -55,8 +56,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (_welcomeToastShown) return;
     _welcomeToastShown = true;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      String greetingName = name;
+      try {
+        final full =
+            await ref.read(profileRepositoryProvider).readCurrentDisplayName();
+        if (full.trim().isNotEmpty) {
+          greetingName = full.trim().split(' ').first;
+        }
+      } catch (_) {}
+      if (!mounted) return;
+      ref
+          .read(notificationsProvider.notifier)
+          .addWelcomeNotification(greetingName);
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -102,7 +115,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Selamat Datang, $name!',
+                        'Selamat Datang, $greetingName!',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -139,9 +152,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.watch(authStateProvider).asData?.value ??
         ref.watch(firebaseAuthProvider).currentUser;
-    final name = user?.displayName?.split(' ').first ??
+    final savedDisplayName =
+        ref.watch(profileDisplayNameProvider).asData?.value;
+    final fullName = savedDisplayName ??
+        user?.displayName ??
         user?.email?.split('@').first ??
         'Mahasiswa';
+    final name = fullName.trim().split(' ').first;
 
     _showCleanWelcomeToast(name, isDark);
 
@@ -175,63 +192,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 4),
               Text('Pantau kondisi fasilitas kampus hari ini.',
                   style: TextStyle(color: colors.onSurfaceVariant)),
-              if (role.isTechnician) ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2C220E), Color(0xFF1B2E24)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.amber.shade700),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.engineering_rounded,
-                          color: Colors.amber, size: 28),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Panel Petugas GA & Satpam Aktif',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Kelola tiket kendala fasilitas, mulai perbaikan atau tandai selesai.',
-                              style: TextStyle(
-                                  color: Colors.white70, fontSize: 11),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.amber.shade700,
-                          foregroundColor: Colors.black,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        onPressed: () => Navigator.pushNamed(
-                            context, AppRoutes.technicianTickets),
-                        child: const Text('Buka Tiket',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w800, fontSize: 12)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: 17),
               Container(
                 padding:
@@ -359,6 +319,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             } else if (index == 2) {
               Navigator.pushNamed(context, AppRoutes.profile);
             }
+          } else if (role.isAdmin) {
+            if (index == 1) {
+              Navigator.pushNamed(context, AppRoutes.adminDashboard);
+            } else if (index == 2) {
+              Navigator.pushNamed(context, AppRoutes.profile);
+            }
           } else {
             if (index == 1) Navigator.pushNamed(context, AppRoutes.profile);
           }
@@ -372,12 +338,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 NavigationDestination(
                     icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
               ]
-            : const [
-                NavigationDestination(
-                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
-                NavigationDestination(
-                    icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
-              ],
+            : role.isAdmin
+                ? const [
+                    NavigationDestination(
+                        icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                    NavigationDestination(
+                        icon: Icon(Icons.admin_panel_settings_rounded),
+                        label: 'Panel Admin'),
+                    NavigationDestination(
+                        icon: Icon(Icons.person_outline_rounded),
+                        label: 'Profil'),
+                  ]
+                : const [
+                    NavigationDestination(
+                        icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                    NavigationDestination(
+                        icon: Icon(Icons.person_outline_rounded),
+                        label: 'Profil'),
+                  ],
       ),
     );
   }

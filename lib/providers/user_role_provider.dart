@@ -17,6 +17,24 @@ class UserRoleNotifier extends Notifier<UserRole> {
     return UserRole.student; // Default while loading
   }
 
+  static bool isDemoAdminEmail(String? email) {
+    if (email == null) return false;
+    final clean = email.trim().toLowerCase();
+    return clean == 'admin@pradita.ac.id' ||
+        clean == 'admin@campusghost.ac.id' ||
+        clean.startsWith('admin@');
+  }
+
+  static bool isDemoTechnicianEmail(String? email) {
+    if (email == null) return false;
+    final clean = email.trim().toLowerCase();
+    return clean == 'teknisi.ga@pradita.ac.id' ||
+        clean == 'teknisi@pradita.ac.id' ||
+        clean == 'teknisi@campusghost.ac.id' ||
+        clean.startsWith('teknisi') ||
+        clean.contains('teknisi.ga');
+  }
+
   Future<void> _initializeFromToken() async {
     try {
       if (Firebase.apps.isEmpty) {
@@ -25,6 +43,18 @@ class UserRoleNotifier extends Notifier<UserRole> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         logger.info('UserRoleNotifier', 'No authenticated user, using default student role');
+        return;
+      }
+
+      // 0. Akun khusus demo langsung diarahkan ke peran yang tepat
+      if (isDemoAdminEmail(user.email)) {
+        state = UserRole.admin;
+        logger.info('UserRoleNotifier', 'Role initialized as admin via demo credentials: ${user.email}');
+        return;
+      }
+      if (isDemoTechnicianEmail(user.email)) {
+        state = UserRole.technician;
+        logger.info('UserRoleNotifier', 'Role initialized as technician via demo credentials: ${user.email}');
         return;
       }
 
@@ -81,6 +111,16 @@ class UserRoleNotifier extends Notifier<UserRole> {
       if (Firebase.apps.isEmpty) return;
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
+
+      // 0. Akun khusus demo langsung diarahkan ke peran yang tepat
+      if (isDemoAdminEmail(user.email)) {
+        state = UserRole.admin;
+        return;
+      }
+      if (isDemoTechnicianEmail(user.email)) {
+        state = UserRole.technician;
+        return;
+      }
 
       // Force token refresh
       await user.getIdToken(true);

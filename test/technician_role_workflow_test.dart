@@ -14,6 +14,8 @@ import 'package:campus_ghost/repositories/report_repository.dart';
 class FakeReportRepository extends Fake implements ReportRepository {
   ReportStatus? lastUpdatedStatus;
   String? lastUpdatedReportId;
+  String? lastAssignedTo;
+  String? lastTechnicianNote;
 
   @override
   Future<void> updateReport({
@@ -27,6 +29,21 @@ class FakeReportRepository extends Fake implements ReportRepository {
   }) async {
     lastUpdatedReportId = reportId;
     lastUpdatedStatus = status;
+  }
+
+  @override
+  Future<void> updateTicketByTechnician({
+    required String reportId,
+    required ReportStatus status,
+    String? ownerUserId,
+    String? assignedTo,
+    String? technicianNote,
+    DateTime? resolvedAt,
+  }) async {
+    lastUpdatedReportId = reportId;
+    lastUpdatedStatus = status;
+    lastAssignedTo = assignedTo;
+    lastTechnicianNote = technicianNote;
   }
 }
 
@@ -101,20 +118,29 @@ void main() {
 
       expect(fakeRepo.lastUpdatedReportId, equals('test_rep_101'));
       expect(fakeRepo.lastUpdatedStatus, equals(ReportStatus.inProgress));
+      expect(fakeRepo.lastAssignedTo, isNotEmpty);
 
       final notifsAfterStart = container.read(notificationsProvider);
       expect(notifsAfterStart.length, equals(notifsBefore + 1));
       expect(notifsAfterStart.first.title, contains('Sedang Diperbaiki'));
       expect(notifsAfterStart.first.type, equals(CampusNotificationType.inProgress));
 
-      // 2. Teknisi klik "Tandai Selesai"
-      await technicianAction.resolveTicket(report);
+      // 2. Teknisi klik "Tandai Selesai" dengan catatan perbaikan
+      await technicianAction.resolveTicket(
+        report,
+        technicianNote: 'Filter AC dibersihkan dan suhu sudah normal.',
+      );
 
       expect(fakeRepo.lastUpdatedStatus, equals(ReportStatus.resolved));
+      expect(
+        fakeRepo.lastTechnicianNote,
+        equals('Filter AC dibersihkan dan suhu sudah normal.'),
+      );
 
       final notifsAfterResolve = container.read(notificationsProvider);
       expect(notifsAfterResolve.length, equals(notifsBefore + 2));
       expect(notifsAfterResolve.first.title, contains('Perbaikan Selesai'));
+      expect(notifsAfterResolve.first.message, contains('Filter AC dibersihkan'));
       expect(notifsAfterResolve.first.type, equals(CampusNotificationType.resolved));
     });
   });

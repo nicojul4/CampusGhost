@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,6 +39,24 @@ class ReportRepository {
 
   String _currentUserId() => _auth.currentUser?.uid ?? 'guest_user';
 
+  Future<String?> _currentReporterName() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return null;
+    try {
+      final storedName = (await _store.readProfileName(currentUser.uid))?.trim();
+      if (storedName != null && storedName.isNotEmpty) return storedName;
+    } catch (_) {}
+    try {
+      final name = currentUser.displayName?.trim();
+      if (name != null && name.isNotEmpty) return name;
+    } catch (_) {}
+    try {
+      final emailPrefix = currentUser.email?.split('@').first;
+      if (emailPrefix != null && emailPrefix.isNotEmpty) return emailPrefix;
+    } catch (_) {}
+    return null;
+  }
+
   Stream<List<ReportModel>> watchReportsForUser([String? targetUserId]) async* {
     final userId = targetUserId ?? _currentUserId();
     await for (final values in _store.watchReports(userId)) {
@@ -49,6 +68,70 @@ class ReportRepository {
 
   Stream<List<ReportModel>> watchAll([String? targetUserId]) =>
       watchCurrentUser(targetUserId);
+
+  /// Stream semua laporan lintas pengguna untuk panel Teknisi GA & Satpam.
+  /// Menggabungkan data lokal lintas akun dan stream Firestore (jika tersedia/diizinkan).
+  Stream<List<ReportModel>> watchAllReports() {
+    final controller = StreamController<List<ReportModel>>();
+    List<ReportModel> localReports = const [];
+    List<ReportModel> remoteReports = const [];
+
+    void emitMerged() {
+      if (controller.isClosed) return;
+      final merged = <String, ReportModel>{};
+      for (final item in localReports) {
+        merged[item.id] = item;
+      }
+      for (final item in remoteReports) {
+        final existing = merged[item.id];
+        if (existing == null) {
+          merged[item.id] = item;
+        } else {
+          final remoteTime = item.updatedAt ?? item.createdAt ?? DateTime(0);
+          final localTime = existing.updatedAt ?? existing.createdAt ?? DateTime(0);
+          if (remoteTime.isAfter(localTime)) {
+            merged[item.id] = item;
+          }
+        }
+      }
+      final list = merged.values.toList()
+        ..sort((a, b) =>
+            (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+      controller.add(list);
+    }
+
+    final localSub = _store.watchAllReports().listen(
+      (values) {
+        localReports = values.map((v) => _toModel(v, values)).toList();
+        emitMerged();
+      },
+      onError: (Object error, StackTrace stack) {
+        logger.errorWithStack('ReportRepository', 'Error reading local all reports', error, stack);
+      },
+    );
+
+    StreamSubscription<List<ReportModel>>? remoteSub;
+    if (_firestoreService != null) {
+      remoteSub = _firestoreService.watchReports().listen(
+        (items) {
+          remoteReports = items;
+          emitMerged();
+        },
+        onError: (Object error) {
+          // Dalam mode preview lokal tanpa custom claim backend, Firestore dapat menolak
+          // query lintas user; fallback tetap aman menggunakan penyimpanan lokal.
+          logger.info('ReportRepository', 'Firestore cross-user watch fallback to local: $error');
+        },
+      );
+    }
+
+    controller.onCancel = () async {
+      await localSub.cancel();
+      await remoteSub?.cancel();
+    };
+
+    return controller.stream;
+  }
 
   Stream<List<ReportModel>> watchIncident(String incidentId,
       [String? targetUserId]) async* {
@@ -174,9 +257,12 @@ class ReportRepository {
         ? _newId(now)
         : activeIncident.first['IncidentId'] as String;
     final reportId = _newId(now);
+    final reporterName = await _currentReporterName();
     final record = <String, dynamic>{
       'Id': reportId,
       'UserId': userId,
+      if (reporterName != null && reporterName.isNotEmpty)
+        'ReporterName': reporterName,
       'LocationId': locationId,
       'Category': category,
       'Description': description,
@@ -197,10 +283,12 @@ class ReportRepository {
         logger.info('ReportRepository',
             'Creating report in Firestore for location: $locationId, category: $category');
         await _firestoreService.createReport(
+          id: reportId,
           category: category,
           locationId: locationId,
           description: description,
           userId: userId,
+          reporterName: reporterName,
           photoUrl: photoUrl,
           latitude: latitude,
           longitude: longitude,
@@ -284,11 +372,78 @@ class ReportRepository {
     }
   }
 
+  /// Memperbarui tiket oleh Teknisi GA / Satpam (mendukung tiket lintas pengguna).
+  Future<void> updateTicketByTechnician({
+    required String reportId,
+    required ReportStatus status,
+    String? ownerUserId,
+    String? assignedTo,
+    String? technicianNote,
+    DateTime? resolvedAt,
+  }) async {
+    final now = DateTime.now().toUtc();
+    await _store.updateReportAcrossUsers(
+      reportId,
+      (existing) {
+        existing['Status'] = status.value;
+        existing['UpdatedAt'] = now.toIso8601String();
+        if (assignedTo != null) existing['AssignedTo'] = assignedTo;
+        if (technicianNote != null) existing['TechnicianNote'] = technicianNote;
+        if (resolvedAt != null) {
+          existing['ResolvedAt'] = resolvedAt.toIso8601String();
+        } else if (status != ReportStatus.resolved) {
+          existing.remove('ResolvedAt');
+        }
+        return existing;
+      },
+      preferredUserId: ownerUserId,
+    );
+
+    if (_firestoreService != null) {
+      try {
+        logger.info('ReportRepository',
+            'Technician updating ticket $reportId to ${status.value}');
+        await _firestoreService.updateReportStatus(
+          reportId: reportId,
+          status: status,
+          assignedTo: assignedTo,
+          technicianNote: technicianNote,
+          resolvedAt: resolvedAt,
+        );
+        logger.info('ReportRepository', 'Ticket updated in Firestore successfully');
+      } catch (e, stackTrace) {
+        logger.errorWithStack('ReportRepository',
+            'Failed to update ticket in Firestore (local state preserved)', e, stackTrace);
+      }
+    }
+  }
+
   Future<void> deleteReport(String reportId) async {
     final userId = _currentUserId();
     final removed = await _store.deleteReport(userId, reportId);
     if (!removed) {
       throw StateError('report_not_found');
+    }
+    if (_firestoreService != null) {
+      try {
+        await _firestoreService.deleteReport(reportId);
+      } catch (e) {
+        logger.info('ReportRepository', 'Firestore delete skipped: $e');
+      }
+    }
+  }
+
+  /// Menghapus seluruh cache laporan lokal maupun dokumen Firestore yang dapat diakses user/staf.
+  Future<void> clearAllReports() async {
+    await _store.clearAllReports();
+    if (_firestoreService != null) {
+      try {
+        await _firestoreService.deleteAllAccessibleReports(
+          forUserId: _auth.currentUser?.uid,
+        );
+      } catch (e) {
+        logger.info('ReportRepository', 'Firestore clear skipped: $e');
+      }
     }
   }
 
@@ -330,14 +485,15 @@ class ReportRepository {
                   latest == null || date.isAfter(latest) ? date : latest);
     }
 
-    final explicitlyResolved = value['Status'] == ReportStatus.resolved.value;
+    final parsedStatus = ReportStatus.fromValue(value['Status']);
     final autoResolved = lastReportAt != null &&
         lastReportAt.isBefore(
           DateTime.now().toUtc().subtract(
                 const Duration(hours: 24),
               ),
         );
-    final resolved = explicitlyResolved || autoResolved;
+    final resolved = parsedStatus == ReportStatus.resolved || autoResolved;
+    final effectiveStatus = resolved ? ReportStatus.resolved : parsedStatus;
     final latRaw = value['Latitude'];
     final lngRaw = value['Longitude'];
     return ReportModel(
@@ -347,13 +503,17 @@ class ReportRepository {
       category: value['Category'] as String? ?? 'Lainnya',
       description: value['Description'] as String? ?? '',
       photoUrl: value['PhotoUrl'] as String?,
-      status: resolved ? ReportStatus.resolved : ReportStatus.active,
+      status: effectiveStatus,
       incidentId: incidentId,
       createdAt: createdAt,
       updatedAt: DateTime.tryParse(value['UpdatedAt'] as String? ?? ''),
       latitude: latRaw is num ? latRaw.toDouble() : null,
       longitude: lngRaw is num ? lngRaw.toDouble() : null,
       locationDetail: value['LocationDetail'] as String?,
+      assignedTo: value['AssignedTo'] as String?,
+      technicianNote: value['TechnicianNote'] as String?,
+      reporterName: value['ReporterName'] as String?,
+      resolvedAt: DateTime.tryParse(value['ResolvedAt'] as String? ?? ''),
     );
   }
 

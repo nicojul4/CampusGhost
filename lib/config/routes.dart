@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/home/home_screen.dart';
@@ -26,6 +27,7 @@ class AppRoutes {
   static const createReport = '/create-report';
   static const apiReports = '/api-reports';
   static const technicianTickets = '/technician/tickets';
+  static const adminDashboard = '/admin';
 
   static Map<String, WidgetBuilder> get routes => {
         root: (_) => const SplashScreen(),
@@ -40,5 +42,7 @@ class AppRoutes {
         apiReports: (_) => const ProtectedRoute(child: ApiReportsScreen()),
         technicianTickets: (_) =>
             const ProtectedRoute(child: TechnicianTicketsScreen()),
+        adminDashboard: (_) =>
+            const ProtectedRoute(child: AdminDashboardScreen()),
       };
 }

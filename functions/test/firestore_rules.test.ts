@@ -59,6 +59,9 @@ beforeEach(async function () {
 function authed(uid: string) {
   return env.authenticatedContext(uid).firestore();
 }
+function authedWithRole(uid: string, role: string) {
+  return env.authenticatedContext(uid, {role}).firestore();
+}
 function unauthed() {
   return env.unauthenticatedContext().firestore();
 }
@@ -86,6 +89,13 @@ async function adminSet(collection: string, docId: string, data: object) {
     await adminSet('users', UID, {uid: UID, role: 'student', isActive: true});
     await assertFails(
       authed('other-user').collection('users').doc(UID).get(),
+    );
+  });
+
+  it('admin can read another profile', async () => {
+    await adminSet('users', UID, {uid: UID, role: 'student', isActive: true});
+    await assertSucceeds(
+      authedWithRole('admin-user', 'admin').collection('users').doc(UID).get(),
     );
   });
 
@@ -369,6 +379,25 @@ async function adminSet(collection: string, docId: string, data: object) {
       unauthed().collection('reports').doc(REPORT).get(),
     );
   });
+
+  it('technician can read another user report', async () => {
+    await adminSet('reports', REPORT, {...validReport, userId: UID, UserId: UID});
+    await assertSucceeds(
+      authedWithRole('tech-001', 'technician').collection('reports').doc(REPORT).get(),
+    );
+  });
+
+  it('technician can update report workflow status and notes', async () => {
+    await adminSet('reports', REPORT, {...validReport, userId: UID, UserId: UID});
+    await assertSucceeds(
+      authedWithRole('tech-001', 'technician').collection('reports').doc(REPORT).update({
+        status: 'In Progress',
+        Status: 'In Progress',
+        assignedTo: 'Teknisi GA',
+        technicianNote: 'Sedang dicek di lokasi',
+      }),
+    );
+  });
 });
 
 // ── system/{document} ───────────────────────────────────────────────────────
@@ -400,10 +429,17 @@ async function adminSet(collection: string, docId: string, data: object) {
 // ── audit_logs ───────────────────────────────────────────────────────────────
 
 (SKIP ? describe.skip : describe)('Security Rules: audit_logs collection', () => {
-  it('no client can read audit_logs', async () => {
+  it('non-admin client cannot read audit_logs', async () => {
     await adminSet('audit_logs', 'log-1', {action: 'test'});
     await assertFails(
       authed('any-user').collection('audit_logs').doc('log-1').get(),
+    );
+  });
+
+  it('admin can read audit_logs', async () => {
+    await adminSet('audit_logs', 'log-1', {action: 'test'});
+    await assertSucceeds(
+      authedWithRole('admin-user', 'admin').collection('audit_logs').doc('log-1').get(),
     );
   });
 

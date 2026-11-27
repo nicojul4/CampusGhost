@@ -14,6 +14,9 @@ class ThemeModeScope extends InheritedWidget {
   static ThemeModeScope of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ThemeModeScope>()!;
 
+  static ThemeModeScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ThemeModeScope>();
+
   @override
   bool updateShouldNotify(ThemeModeScope oldWidget) =>
       isDark != oldWidget.isDark || onChanged != oldWidget.onChanged;

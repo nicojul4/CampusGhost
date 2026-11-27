@@ -3,12 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../enums/user_role.dart';
 import '../models/notification_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/user_role_provider.dart';
 import 'report_photo_viewer.dart';
+import 'role_switcher_dialog.dart';
+import 'theme_mode_scope.dart';
 
 const campusGreen = Color(0xFF0B6837);
 const campusOrange = Color(0xFFF16E21);
@@ -29,10 +30,14 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value;
     final profilePhoto = ref.watch(profilePhotoProvider).asData?.value;
+    final savedDisplayName =
+        ref.watch(profileDisplayNameProvider).asData?.value;
     final unreadNotifs = ref.watch(unreadNotificationsCountProvider);
-    final name = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!.trim()
-        : user?.email?.split('@').first ?? 'Mahasiswa';
+    final name = (savedDisplayName != null && savedDisplayName.trim().isNotEmpty)
+        ? savedDisplayName.trim()
+        : (user?.displayName?.trim().isNotEmpty == true
+            ? user!.displayName!.trim()
+            : user?.email?.split('@').first ?? 'Mahasiswa');
     final initial = name.isEmpty ? 'M' : name[0].toUpperCase();
 
     return AppBar(
@@ -69,14 +74,20 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
         Consumer(
           builder: (context, ref, _) {
             final role = ref.watch(userRoleProvider);
-            final isTech = role.isTechnician;
+            final icon = switch (role) {
+              _ when role.isAdmin => Icons.admin_panel_settings_rounded,
+              _ when role.isTechnician => Icons.engineering_rounded,
+              _ => Icons.school_outlined,
+            };
+            final color = switch (role) {
+              _ when role.isAdmin => Colors.redAccent,
+              _ when role.isTechnician => Colors.amber,
+              _ => null,
+            };
             return IconButton(
               tooltip: 'Peran: ${role.label} (Klik untuk ganti)',
-              onPressed: () => _showRoleDialog(context, ref),
-              icon: Icon(
-                isTech ? Icons.engineering_rounded : Icons.school_outlined,
-                color: isTech ? Colors.amber : null,
-              ),
+              onPressed: () => showRoleSwitcherDialog(context, ref),
+              icon: Icon(icon, color: color),
             );
           },
         ),
@@ -100,6 +111,22 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ),
         IconButton(
+          tooltip: Theme.of(context).brightness == Brightness.dark
+              ? 'Beralih ke mode terang'
+              : 'Beralih ke mode gelap',
+          icon: Icon(
+            Theme.of(context).brightness == Brightness.dark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
+          ),
+          onPressed: () {
+            final scope = ThemeModeScope.maybeOf(context);
+            if (scope != null) {
+              scope.onChanged(!scope.isDark);
+            }
+          },
+        ),
+        IconButton(
           tooltip: 'Buka profil',
           onPressed: onProfile,
           icon: CircleAvatar(
@@ -116,58 +143,6 @@ class CampusHeader extends ConsumerWidget implements PreferredSizeWidget {
           ),
         ),
       ],
-    );
-  }
-
-  void _showRoleDialog(BuildContext context, WidgetRef ref) {
-    final currentRole = ref.read(userRoleProvider);
-    showDialog<void>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Pilih Peran Pengguna'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              leading: const Icon(Icons.school_rounded, color: campusGreen),
-              title: const Text('Mahasiswa / Dosen'),
-              subtitle: const Text('Pelapor kendala fasilitas kampus'),
-              trailing: currentRole == UserRole.student
-                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
-                  : null,
-              enabled: currentRole == UserRole.student,
-            ),
-            const Divider(),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              leading:
-                  const Icon(Icons.engineering_rounded, color: Colors.amber),
-              title: const Text('Teknisi GA & Satpam'),
-              subtitle: const Text('Penerima tiket & penanganan perbaikan'),
-              trailing: currentRole == UserRole.technician
-                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
-                  : null,
-              enabled: currentRole == UserRole.technician,
-            ),
-            const Divider(),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              leading:
-                  const Icon(Icons.admin_panel_settings_rounded, color: Colors.red),
-              title: const Text('Administrator'),
-              subtitle: const Text('Pengelola sistem & penugasan'),
-              trailing: currentRole == UserRole.admin
-                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
-                  : null,
-              enabled: currentRole == UserRole.admin,
-            ),
-          ],
-        ),
-      ),
     );
   }
 

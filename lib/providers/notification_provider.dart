@@ -13,51 +13,7 @@ final unreadNotificationsCountProvider = Provider<int>((ref) {
 
 class NotificationsNotifier extends Notifier<List<CampusNotification>> {
   @override
-  List<CampusNotification> build() {
-    final now = DateTime.now();
-    return [
-      CampusNotification(
-        id: 'notif-welcome',
-        title: 'Selamat Datang di CampusGhost!',
-        message:
-            'Pantau kendala dan laporkan fasilitas kampus Pradita University dengan cepat dan mudah.',
-        category: 'Kampus',
-        createdAt: now,
-        isRead: false,
-        type: CampusNotificationType.info,
-      ),
-      CampusNotification(
-        id: 'notif-1',
-        title: 'AC Gedung 2 Ruang 202 Sedang Diperbaiki',
-        message:
-            'Teknisi Sarpras/GA telah menerima laporan Anda dan sedang melakukan perbaikan di lokasi.',
-        category: 'Ac',
-        createdAt: now.subtract(const Duration(minutes: 15)),
-        isRead: false,
-        type: CampusNotificationType.inProgress,
-      ),
-      CampusNotification(
-        id: 'notif-2',
-        title: 'Investigasi Wi-Fi Gedung 1 Lantai 3',
-        message:
-            'Tiket #ICT-402 telah diteruskan ke tim jaringan Pradita untuk pengecekan access point.',
-        category: 'Wifi',
-        createdAt: now.subtract(const Duration(hours: 1, minutes: 20)),
-        isRead: false,
-        type: CampusNotificationType.info,
-      ),
-      CampusNotification(
-        id: 'notif-3',
-        title: 'Perbaikan Lift Gedung Utama Selesai',
-        message:
-            'Lift penumpang 01 telah selesai diperbaiki dan siap digunakan kembali secara normal.',
-        category: 'Lift',
-        createdAt: now.subtract(const Duration(hours: 3)),
-        isRead: true,
-        type: CampusNotificationType.resolved,
-      ),
-    ];
-  }
+  List<CampusNotification> build() => const [];
 
   void markAllAsRead() {
     state = [
@@ -70,6 +26,25 @@ class NotificationsNotifier extends Notifier<List<CampusNotification>> {
       for (final item in state)
         if (item.id == id) item.copyWith(isRead: true) else item,
     ];
+  }
+
+  void clearAll() {
+    state = const [];
+  }
+
+  void addWelcomeNotification(String userName) {
+    if (state.any((n) => n.id == 'notif-welcome')) return;
+    final welcome = CampusNotification(
+      id: 'notif-welcome',
+      title: 'Selamat Datang, $userName!',
+      message:
+          'Pantau dan laporkan kondisi fasilitas kampus dengan mudah.',
+      category: 'Kampus',
+      createdAt: DateTime.now(),
+      isRead: false,
+      type: CampusNotificationType.info,
+    );
+    state = [welcome, ...state];
   }
 
   void addNotification({

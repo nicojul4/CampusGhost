@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/routes.dart';
+import '../../enums/user_role.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/firebase_provider.dart';
+import '../../providers/user_role_provider.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../auth/login_screen.dart';
 import '../home/home_screen.dart';
+import '../technician/technician_tickets_screen.dart';
 
 /// Transisi halaman yang halus (Fade + Subtle Slide) untuk pengalaman pengguna bebas patah-patah.
 class SmoothPageRoute<T> extends PageRouteBuilder<T> {
@@ -155,9 +159,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final user = ref.read(authStateProvider).asData?.value ??
         ref.read(firebaseAuthProvider).currentUser;
 
-    final Widget targetScreen =
-        user != null ? const DashboardScreen() : const LoginScreen();
+    if (user == null) {
+      Navigator.of(context).pushReplacement(
+        SmoothPageRoute(page: const LoginScreen()),
+      );
+      return;
+    }
 
+    await ref.read(userRoleProvider.notifier).refreshFromToken();
+    final role = ref.read(userRoleProvider);
+
+    final Widget targetScreen = switch (role) {
+      UserRole.admin => const AdminDashboardScreen(),
+      UserRole.technician => const TechnicianTicketsScreen(),
+      UserRole.student => const DashboardScreen(),
+    };
+
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       SmoothPageRoute(page: targetScreen),
     );

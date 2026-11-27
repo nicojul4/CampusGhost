@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../enums/user_role.dart';
 import '../providers/auth_provider.dart';
+import '../providers/user_role_provider.dart';
+import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/technician/technician_tickets_screen.dart';
 import 'campus_ui.dart';
 
 /// AuthGate mengontrol navigasi root berdasarkan status autentikasi pengguna.
-/// - Jika sesi aktif (auto-login), langsung masuk ke Dashboard.
+/// - Jika sesi aktif (auto-login), langsung masuk ke Dashboard sesuai perannya:
+///   Admin -> AdminDashboardScreen, Teknisi GA -> TechnicianTicketsScreen, Mahasiswa -> DashboardScreen.
 /// - Jika belum login, menampilkan LoginScreen (route terproteksi).
 /// - Jika sesi berakhir/logout, otomatis kembali ke LoginScreen.
 class AuthGate extends ConsumerWidget {
@@ -22,7 +27,12 @@ class AuthGate extends ConsumerWidget {
       error: (_, __) => const LoginScreen(),
       data: (user) {
         if (user != null) {
-          return const DashboardScreen();
+          final role = ref.watch(userRoleProvider);
+          return switch (role) {
+            UserRole.admin => const AdminDashboardScreen(),
+            UserRole.technician => const TechnicianTicketsScreen(),
+            UserRole.student => const DashboardScreen(),
+          };
         }
         return const LoginScreen();
       },

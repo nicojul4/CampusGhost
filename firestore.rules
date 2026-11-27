@@ -11,13 +11,29 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function isStaff() {
+      return signedIn() && (
+        request.auth.token.get('role', '') in ['technician', 'admin']
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['technician', 'admin'])
+      );
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.get('role', '') == 'admin'
+        || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
     // ── users ─────────────────────────────────────────────────────────────────
     // Privileged fields are NEVER writable by the client.
     // All changes to role, isActive, roleVersion, provisioningStatus,
     // deactivatedAt, deactivatedBy, and claimsOutOfSync go through
     // Cloud Functions (Admin SDK) which bypass these rules.
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
 
       // Create: client must own the document, declare role='student',
       // isActive=true, and must not include any privileged field.
@@ -60,23 +76,25 @@ service cloud.firestore {
     // Existing data uses both PascalCase (UserId, LocationId …) and camelCase
     // (userId, locationId …) field names.  Both variants are covered below.
     match /reports/{reportId} {
-      // Read: only the owner can read their own report.
+      // Read: owner or authorized staff (technician / admin) can read reports.
       allow read: if signedIn()
         && (resource.data.userId == request.auth.uid
-            || resource.data.UserId == request.auth.uid);
+            || resource.data.UserId == request.auth.uid
+            || isStaff());
 
       // Create:
       //   - Caller must supply EXACTLY one of userId / UserId and it must
       //     match request.auth.uid.  Omitting both is rejected.
       //   - If both are present they must agree AND equal the authenticated uid.
       //   - status / Status may be supplied but must be 'Active'.
-      //   - Workflow-only fields (incidentId, assignedTo) must not be present.
+      //   - Workflow-only fields (incidentId, assignedTo, technicianNote, resolvedAt) must not be present.
       allow create: if signedIn()
 
         // Field allowlist — no other top-level keys permitted
         && request.resource.data.keys().hasOnly([
              'id', 'Id',
              'userId', 'UserId',
+             'reporterName',
              'locationId', 'LocationId',
              'category', 'Category',
              'description', 'Description',
@@ -115,11 +133,11 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['Status'])
             || request.resource.data.Status in ['Active', 'Active']);
 
-      // Update (owner only):
-      //   - Identity, timestamps, and workflow fields are immutable.
-      //   - Owners may update description, photo, location details only.
-      //   - status / Status changes are reserved for backend workflows.
-      allow update: if signedIn()
+      // Update:
+      //   1. Owner only: identity, timestamps, and workflow fields are immutable.
+      //   2. Staff (technician / admin): may update ticket workflow status & notes.
+      allow update: if (
+        signedIn()
         && (resource.data.userId == request.auth.uid
             || resource.data.UserId == request.auth.uid)
         && !request.resource.data.diff(resource.data).affectedKeys()
@@ -129,13 +147,26 @@ service cloud.firestore {
                'createdAt', 'CreatedAt',
                'incidentId', 'IncidentId',
                'status', 'Status',
-               'assignedTo'
-             ]);
+               'assignedTo', 'technicianNote', 'resolvedAt'
+             ])
+      ) || (
+        isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+             'status', 'Status',
+             'assignedTo', 'technicianNote', 'resolvedAt',
+             'updatedAt', 'UpdatedAt'
+           ])
+        && (!request.resource.data.keys().hasAny(['status'])
+            || request.resource.data.status in ['Active', 'In Progress', 'Resolved'])
+        && (!request.resource.data.keys().hasAny(['Status'])
+            || request.resource.data.Status in ['Active', 'In Progress', 'Resolved'])
+      );
 
-      // Delete: owner only
+      // Delete: owner or authorized staff
       allow delete: if signedIn()
         && (resource.data.userId == request.auth.uid
-            || resource.data.UserId == request.auth.uid);
+            || resource.data.UserId == request.auth.uid
+            || isStaff());
     }
 
     // ── incidents ──────────────────────────────────────────────────────────
@@ -156,7 +187,8 @@ service cloud.firestore {
 
     // ── audit logs ─────────────────────────────────────────────────────────
     match /audit_logs/{logId} {
-      allow read, write: if false;
+      allow read:  if isAdmin();
+      allow write: if false;
     }
   }
 }

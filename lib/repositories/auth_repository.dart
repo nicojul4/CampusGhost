@@ -34,13 +34,51 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final result = await _auth.signInWithEmailAndPassword(
-      email: email.trim(),
-      password: password,
-    );
-    final user = result.user;
-    if (user == null) throw FirebaseAuthException(code: 'user-not-found');
-    return user;
+    final cleanEmail = email.trim();
+    try {
+      final result = await _auth.signInWithEmailAndPassword(
+        email: cleanEmail,
+        password: password,
+      );
+      final user = result.user;
+      if (user == null) throw FirebaseAuthException(code: 'user-not-found');
+      return user;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        if (_isDemoEmail(cleanEmail)) {
+          try {
+            final reg = await _auth.createUserWithEmailAndPassword(
+              email: cleanEmail,
+              password: password,
+            );
+            final user = reg.user;
+            if (user != null) {
+              final displayName = cleanEmail.toLowerCase().startsWith('admin')
+                  ? 'Administrator Kampus'
+                  : (cleanEmail.toLowerCase().startsWith('teknisi')
+                      ? 'Pak Budi GA'
+                      : 'Nicolas Julian');
+              await user.updateDisplayName(displayName);
+              return user;
+            }
+          } catch (_) {}
+        }
+      }
+      rethrow;
+    }
+  }
+
+  static bool _isDemoEmail(String email) {
+    final clean = email.toLowerCase().trim();
+    return clean == 'admin@pradita.ac.id' ||
+        clean == 'admin@campusghost.ac.id' ||
+        clean.startsWith('admin@') ||
+        clean == 'teknisi.ga@pradita.ac.id' ||
+        clean == 'teknisi@pradita.ac.id' ||
+        clean == 'teknisi@campusghost.ac.id' ||
+        clean.startsWith('teknisi') ||
+        clean == 'mahasiswa@student.pradita.ac.id' ||
+        clean == 'nicolas.julian@student.pradita.ac.id';
   }
 
   /// Registers a new user and creates their Firestore profile.
@@ -124,6 +162,37 @@ class AuthRepository {
           e, st,
         );
         rethrow;
+      }
+    } else {
+      // Pertahankan nama tampilan kustom yang sudah pernah diubah pengguna di Firestore
+      try {
+        final docRef = _firestore.collection('users').doc(user.uid);
+        final snap = await docRef.get();
+        if (snap.exists) {
+          final savedName = (snap.data()?['displayName'] as String?)?.trim();
+          if (savedName != null &&
+              savedName.isNotEmpty &&
+              savedName != user.displayName) {
+            await user.updateDisplayName(savedName);
+            await user.reload();
+          }
+          await docRef.update({
+            'lastLoginAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          await _writeStudentProfile(
+            uid:         user.uid,
+            email:       user.email ?? '',
+            displayName: user.displayName ??
+                user.email?.split('@').first ??
+                'User',
+            photoUrl:    user.photoURL,
+            isNewUser:   false,
+          );
+        }
+      } catch (e) {
+        logger.info('AuthRepository', 'Existing Google profile sync skipped: $e');
       }
     }
 

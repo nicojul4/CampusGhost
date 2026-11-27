@@ -3,17 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/routes.dart';
 import '../../enums/report_status.dart';
-import '../../enums/user_role.dart';
 import '../../models/report_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/firebase_provider.dart';
 import '../../providers/incident_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/report_provider.dart';
+import '../../providers/technician_tickets_provider.dart';
 import '../../providers/user_role_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/report_photo_codec.dart';
 import '../../widgets/campus_ui.dart';
 import '../../widgets/primary_button.dart';
+import '../../widgets/role_switcher_dialog.dart';
 import '../../widgets/system_log_viewer_modal.dart';
 import '../../widgets/theme_mode_scope.dart';
 
@@ -91,16 +93,60 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _clearDemoCache(BuildContext context, WidgetRef ref) async {
+    final colors = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(Icons.cleaning_services_rounded,
+            color: colors.primary, size: 34),
+        title: const Text('Bersihkan Data Cache?'),
+        content: const Text(
+          'Seluruh cache laporan lokal dan notifikasi akan dikosongkan agar aplikasi siap digunakan untuk demo dari nol.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Bersihkan'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    await ref.read(reportRepositoryProvider).clearAllReports();
+    ref.read(notificationsProvider.notifier).clearAll();
+    ref.invalidate(reportsProvider);
+    ref.invalidate(userReportsProvider);
+    ref.invalidate(incidentsProvider);
+    ref.invalidate(technicianTicketsProvider);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Seluruh data laporan (lokal & cloud) dan notifikasi berhasil dibersihkan.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).asData?.value ??
         ref.watch(firebaseAuthProvider).currentUser;
     final profilePhoto = ref.watch(profilePhotoProvider).asData?.value;
+    final savedDisplayName =
+        ref.watch(profileDisplayNameProvider).asData?.value;
     final reports = ref.watch(userReportsProvider);
     final role = ref.watch(userRoleProvider);
     final colors = Theme.of(context).colorScheme;
     final themeMode = ThemeModeScope.of(context);
-    final displayName = user?.displayName ?? 'Mahasiswa';
+    final displayName = savedDisplayName ?? user?.displayName ?? 'Mahasiswa';
 
     return Scaffold(
       appBar: AppBar(
@@ -269,15 +315,19 @@ class ProfileScreen extends ConsumerWidget {
                 const Divider(height: 1),
                 ListTile(
                   leading: Icon(
-                    role.isTechnician
-                        ? Icons.engineering_rounded
-                        : Icons.school_rounded,
-                    color: role.isTechnician ? Colors.amber : colors.primary,
+                    role.isAdmin
+                        ? Icons.admin_panel_settings_rounded
+                        : (role.isTechnician
+                            ? Icons.engineering_rounded
+                            : Icons.school_rounded),
+                    color: role.isAdmin
+                        ? Colors.redAccent
+                        : (role.isTechnician ? Colors.amber : colors.primary),
                   ),
                   title: const Text('Peran Aplikasi'),
                   subtitle: Text(role.label),
                   trailing: const Icon(Icons.swap_horiz_rounded),
-                  onTap: () => _showRoleDialog(context, ref),
+                  onTap: () => showRoleSwitcherDialog(context, ref),
                 ),
                 const Divider(height: 1),
                 ListTile(
@@ -286,6 +336,15 @@ class ProfileScreen extends ConsumerWidget {
                   subtitle: const Text('Lihat riwayat log saat aplikasi berjalan'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => SystemLogViewerModal.show(context),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.cleaning_services_outlined,
+                      color: Colors.deepOrange),
+                  title: const Text('Bersihkan Cache Data & Notif'),
+                  subtitle: const Text('Kosongkan laporan lokal & notifikasi demo'),
+                  trailing: const Icon(Icons.delete_outline_rounded),
+                  onTap: () => _clearDemoCache(context, ref),
                 ),
               ],
             ),
@@ -308,11 +367,16 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: role.isTechnician ? 2 : 1,
+        selectedIndex: role.isAdmin ? 2 : 1,
         onDestinationSelected: (index) {
           if (role.isTechnician) {
             if (index == 0) {
-              Navigator.pop(context);
+              Navigator.pushReplacementNamed(
+                  context, AppRoutes.technicianTickets);
+            }
+          } else if (role.isAdmin) {
+            if (index == 0) {
+              Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
             } else if (index == 1) {
               Navigator.pushReplacementNamed(
                   context, AppRoutes.technicianTickets);
@@ -324,70 +388,29 @@ class ProfileScreen extends ConsumerWidget {
         destinations: role.isTechnician
             ? const [
                 NavigationDestination(
-                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
-                NavigationDestination(
                     icon: Icon(Icons.engineering_rounded), label: 'Tiket GA'),
                 NavigationDestination(
                     icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
               ]
-            : const [
-                NavigationDestination(
-                    icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
-                NavigationDestination(
-                    icon: Icon(Icons.person_outline_rounded), label: 'Profil'),
-              ],
-      ),
-    );
-  }
-
-  void _showRoleDialog(BuildContext context, WidgetRef ref) {
-    final currentRole = ref.read(userRoleProvider);
-    showDialog<void>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Pilih Peran Pengguna'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              leading: const Icon(Icons.school_rounded, color: campusGreen),
-              title: const Text('Mahasiswa / Dosen'),
-              subtitle: const Text('Pelapor kendala fasilitas kampus'),
-              trailing: currentRole == UserRole.student
-                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
-                  : null,
-              enabled: currentRole == UserRole.student,
-            ),
-            const Divider(),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              leading:
-                  const Icon(Icons.engineering_rounded, color: Colors.amber),
-              title: const Text('Teknisi GA & Satpam'),
-              subtitle: const Text('Penerima tiket & penanganan perbaikan'),
-              trailing: currentRole == UserRole.technician
-                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
-                  : null,
-              enabled: currentRole == UserRole.technician,
-            ),
-            const Divider(),
-            ListTile(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              leading:
-                  const Icon(Icons.admin_panel_settings_rounded, color: Colors.red),
-              title: const Text('Administrator'),
-              subtitle: const Text('Pengelola sistem & penugasan'),
-              trailing: currentRole == UserRole.admin
-                  ? const Icon(Icons.check_circle_rounded, color: campusGreen)
-                  : null,
-              enabled: currentRole == UserRole.admin,
-            ),
-          ],
-        ),
+            : role.isAdmin
+                ? const [
+                    NavigationDestination(
+                        icon: Icon(Icons.admin_panel_settings_rounded),
+                        label: 'Panel Admin'),
+                    NavigationDestination(
+                        icon: Icon(Icons.engineering_rounded),
+                        label: 'Tiket GA'),
+                    NavigationDestination(
+                        icon: Icon(Icons.person_outline_rounded),
+                        label: 'Profil'),
+                  ]
+                : const [
+                    NavigationDestination(
+                        icon: Icon(Icons.grid_view_rounded), label: 'Beranda'),
+                    NavigationDestination(
+                        icon: Icon(Icons.person_outline_rounded),
+                        label: 'Profil'),
+                  ],
       ),
     );
   }
@@ -492,7 +515,9 @@ class _LogoutButtonState extends ConsumerState<_LogoutButton> {
       ref.invalidate(reportsProvider);
       ref.invalidate(userReportsProvider);
       ref.invalidate(incidentsProvider);
+      ref.invalidate(notificationsProvider);
       ref.invalidate(profilePhotoProvider);
+      ref.invalidate(profileDisplayNameProvider);
       ref.invalidate(authStateProvider);
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(

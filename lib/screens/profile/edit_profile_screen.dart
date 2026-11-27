@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/firebase_provider.dart';
@@ -30,17 +32,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void initState() {
     super.initState();
     final user = ref.read(firebaseAuthProvider).currentUser;
+    final cachedName = ref.read(profileDisplayNameProvider).asData?.value;
     _name = TextEditingController(
-      text: user?.displayName ?? user?.email?.split('@').first ?? '',
+      text: cachedName ?? user?.displayName ?? user?.email?.split('@').first ?? '',
     );
-    _loadPhoto();
+    _loadProfile();
   }
 
-  Future<void> _loadPhoto() async {
+  Future<void> _loadProfile() async {
+    final initialText = _name.text;
     try {
-      final photo =
-          await ref.read(profileRepositoryProvider).readCurrentPhoto();
-      if (mounted) setState(() => _savedPhoto = photo);
+      final repo = ref.read(profileRepositoryProvider);
+      final photo = await repo.readCurrentPhoto();
+      final savedName = await repo.readCurrentDisplayName();
+      if (mounted) {
+        setState(() => _savedPhoto = photo);
+        if (_name.text == initialText && savedName.isNotEmpty) {
+          _name.text = savedName;
+        }
+      }
     } catch (_) {
       if (mounted) setState(() => _savedPhoto = null);
     } finally {
@@ -56,16 +66,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _choosePhoto() async {
     try {
-      final file = await openFile(
-        acceptedTypeGroups: const [
-          XTypeGroup(
-            label: 'Foto profil',
-            extensions: ['jpg', 'jpeg', 'png', 'webp'],
-          ),
-        ],
-      );
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
+      Uint8List? bytes;
+      final isMobile = !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS);
+      if (isMobile) {
+        final picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1024,
+          maxHeight: 1024,
+          imageQuality: 85,
+        );
+        if (picked == null) return;
+        bytes = await picked.readAsBytes();
+      } else {
+        final file = await openFile(
+          acceptedTypeGroups: const [
+            XTypeGroup(
+              label: 'Foto profil',
+              extensions: ['jpg', 'jpeg', 'png', 'webp'],
+            ),
+          ],
+        );
+        if (file == null) return;
+        bytes = await file.readAsBytes();
+      }
       final result = validateProfilePhoto(bytes);
       if (result != PhotoValidationResult.valid) {
         if (mounted) _showMessage(photoValidationMessage(result));
@@ -94,7 +119,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           );
       if (!mounted) return;
       ref.invalidate(profilePhotoProvider);
+      ref.invalidate(profileDisplayNameProvider);
       ref.invalidate(authStateProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil berhasil diperbarui.')),
+      );
       Navigator.pop(context);
     } on InvalidProfilePhotoException {
       _showMessage('Foto profil tidak valid. Silakan pilih file gambar lain.');

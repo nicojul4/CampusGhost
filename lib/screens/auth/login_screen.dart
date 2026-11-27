@@ -29,6 +29,37 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  String _targetRouteForEmail(String email) {
+    final clean = email.trim().toLowerCase();
+    if (clean == 'admin@pradita.ac.id' ||
+        clean == 'admin@campusghost.ac.id' ||
+        clean.startsWith('admin@')) {
+      return AppRoutes.adminDashboard;
+    }
+    if (clean == 'teknisi.ga@pradita.ac.id' ||
+        clean == 'teknisi@pradita.ac.id' ||
+        clean == 'teknisi@campusghost.ac.id' ||
+        clean.startsWith('teknisi') ||
+        clean.contains('teknisi.ga')) {
+      return AppRoutes.technicianTickets;
+    }
+    return AppRoutes.dashboard;
+  }
+
+  void _fillDemoAccount(String email, String password) {
+    setState(() {
+      _email.text = email;
+      _password.text = password;
+    });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 2),
+        content: Text('Akun demo dipilih: $email'),
+      ),
+    );
+  }
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate() || _loading || _googleLoading) return;
     setState(() => _loading = true);
@@ -61,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     if (user != null) {
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      Navigator.pushReplacementNamed(context, _targetRouteForEmail(user.email));
     }
   }
 
@@ -98,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     if (user != null) {
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      Navigator.pushReplacementNamed(context, _targetRouteForEmail(user.email));
     }
   }
 
@@ -255,7 +286,83 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 1.45,
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1E2822)
+                                  : const Color(0xFFF1F6F2),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF334237)
+                                    : const Color(0xFFD6E4DA),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.flash_on_rounded,
+                                        size: 15, color: campusOrange),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'PILIH AKUN DEMO / ROLE KHUSUS',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark
+                                            ? colors.primary
+                                            : campusGreen,
+                                        letterSpacing: .5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      _buildDemoChip(
+                                        label: 'Mahasiswa',
+                                        icon: Icons.school_rounded,
+                                        color: isDark
+                                            ? const Color(0xFF8FE1AA)
+                                            : campusGreen,
+                                        email:
+                                            'mahasiswa@student.pradita.ac.id',
+                                        isSelected: _email.text ==
+                                            'mahasiswa@student.pradita.ac.id',
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _buildDemoChip(
+                                        label: 'Teknisi GA',
+                                        icon: Icons.engineering_rounded,
+                                        color: Colors.amber,
+                                        email: 'teknisi.ga@pradita.ac.id',
+                                        isSelected: _email.text ==
+                                            'teknisi.ga@pradita.ac.id',
+                                      ),
+                                      const SizedBox(width: 8),
+                                      _buildDemoChip(
+                                        label: 'Administrator',
+                                        icon:
+                                            Icons.admin_panel_settings_rounded,
+                                        color: Colors.redAccent,
+                                        email: 'admin@pradita.ac.id',
+                                        isSelected:
+                                            _email.text == 'admin@pradita.ac.id',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
                           TextFormField(
                             controller: _email,
                             keyboardType: TextInputType.emailAddress,
@@ -502,6 +609,47 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDemoChip({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required String email,
+    required bool isSelected,
+  }) {
+    return InkWell(
+      onTap: () => _fillDemoAccount(email, 'Password123'),
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color:
+              isSelected ? color.withValues(alpha: 0.16) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : color.withValues(alpha: 0.35),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
         ),
       ),
     );

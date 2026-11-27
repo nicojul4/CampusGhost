@@ -1,27 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'config/routes.dart';
+import 'services/local_campus_store.dart';
 import 'widgets/theme_mode_scope.dart';
 
 class CampusGhostApp extends StatefulWidget {
-  const CampusGhostApp({super.key, required this.firebaseConfigured});
+  const CampusGhostApp({
+    super.key,
+    required this.firebaseConfigured,
+    this.initialThemeMode,
+    this.store,
+  });
 
   final bool firebaseConfigured;
+  final ThemeMode? initialThemeMode;
+  final LocalCampusStore? store;
 
   @override
   State<CampusGhostApp> createState() => _CampusGhostAppState();
 }
 
 class _CampusGhostAppState extends State<CampusGhostApp> {
-  ThemeMode _themeMode = ThemeMode.light;
+  late ThemeMode _themeMode = widget.initialThemeMode ?? ThemeMode.light;
+  LocalCampusStore? _store;
 
   // Cache ThemeData agar tidak dibangun ulang terus menerus saat rebuild (optimasi 60/120fps)
   late final ThemeData _lightTheme = _buildTheme(Brightness.light);
   late final ThemeData _darkTheme = _buildTheme(Brightness.dark);
 
-  void _toggleTheme(bool isDark) => setState(
-        () => _themeMode = isDark ? ThemeMode.dark : ThemeMode.light,
-      );
+  @override
+  void initState() {
+    super.initState();
+    _store = widget.store;
+    if (widget.initialThemeMode == null) {
+      _loadTheme();
+    }
+  }
+
+  Future<void> _loadTheme() async {
+    try {
+      final store = _store ??
+          LocalCampusStore(const FlutterSecureStorage(), enableTimer: false);
+      final isDark = await store.readThemeMode();
+      if (isDark != null && mounted) {
+        setState(() {
+          _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _toggleTheme(bool isDark) {
+    setState(
+      () => _themeMode = isDark ? ThemeMode.dark : ThemeMode.light,
+    );
+    try {
+      final store = _store ??
+          LocalCampusStore(const FlutterSecureStorage(), enableTimer: false);
+      store.saveThemeMode(isDark);
+    } catch (_) {}
+  }
 
   ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;

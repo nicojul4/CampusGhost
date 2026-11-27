@@ -15,3 +15,7 @@ final profilePhotoProvider = FutureProvider<Uint8List?>((ref) {
   ref.watch(authStateProvider);
   return ref.watch(profileRepositoryProvider).readCurrentPhoto();
 });
+final profileDisplayNameProvider = FutureProvider<String>((ref) {
+  ref.watch(authStateProvider);
+  return ref.watch(profileRepositoryProvider).readCurrentDisplayName();
+});

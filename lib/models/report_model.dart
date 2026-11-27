@@ -16,6 +16,10 @@ class ReportModel {
     this.latitude,
     this.longitude,
     this.locationDetail,
+    this.assignedTo,
+    this.technicianNote,
+    this.reporterName,
+    this.resolvedAt,
   });
 
   final String id;
@@ -31,6 +35,10 @@ class ReportModel {
   final double? latitude;
   final double? longitude;
   final String? locationDetail;
+  final String? assignedTo;
+  final String? technicianNote;
+  final String? reporterName;
+  final DateTime? resolvedAt;
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {
     if (!json.containsKey('id') || json['id'] is! String || (json['id'] as String).trim().isEmpty) {
@@ -116,6 +124,11 @@ class ReportModel {
       throw const ValidationException('Field "locationDetail" harus berupa String.');
     }
 
+    DateTime? resolvedAt;
+    if (json['resolvedAt'] is String) {
+      resolvedAt = DateTime.tryParse(json['resolvedAt'] as String);
+    }
+
     return ReportModel(
       id: json['id'] as String,
       userId: userId,
@@ -130,6 +143,10 @@ class ReportModel {
       latitude: latitude,
       longitude: longitude,
       locationDetail: locationDetailRaw as String?,
+      assignedTo: json['assignedTo'] as String?,
+      technicianNote: json['technicianNote'] as String?,
+      reporterName: json['reporterName'] as String?,
+      resolvedAt: resolvedAt,
     );
   }
 
@@ -147,6 +164,10 @@ class ReportModel {
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (locationDetail != null) 'locationDetail': locationDetail,
+        if (assignedTo != null) 'assignedTo': assignedTo,
+        if (technicianNote != null) 'technicianNote': technicianNote,
+        if (reporterName != null) 'reporterName': reporterName,
+        if (resolvedAt != null) 'resolvedAt': resolvedAt!.toIso8601String(),
       };
 
   ReportModel copyWith({
@@ -163,6 +184,10 @@ class ReportModel {
     double? latitude,
     double? longitude,
     String? locationDetail,
+    String? assignedTo,
+    String? technicianNote,
+    String? reporterName,
+    DateTime? resolvedAt,
   }) =>
       ReportModel(
         id: id ?? this.id,
@@ -178,6 +203,10 @@ class ReportModel {
         latitude: latitude ?? this.latitude,
         longitude: longitude ?? this.longitude,
         locationDetail: locationDetail ?? this.locationDetail,
+        assignedTo: assignedTo ?? this.assignedTo,
+        technicianNote: technicianNote ?? this.technicianNote,
+        reporterName: reporterName ?? this.reporterName,
+        resolvedAt: resolvedAt ?? this.resolvedAt,
       );
 
   @override
@@ -195,7 +224,11 @@ class ReportModel {
           incidentId == other.incidentId &&
           latitude == other.latitude &&
           longitude == other.longitude &&
-          locationDetail == other.locationDetail;
+          locationDetail == other.locationDetail &&
+          assignedTo == other.assignedTo &&
+          technicianNote == other.technicianNote &&
+          reporterName == other.reporterName &&
+          resolvedAt == other.resolvedAt;
 
   @override
   int get hashCode =>
@@ -209,5 +242,9 @@ class ReportModel {
       incidentId.hashCode ^
       latitude.hashCode ^
       longitude.hashCode ^
-      locationDetail.hashCode;
+      locationDetail.hashCode ^
+      assignedTo.hashCode ^
+      technicianNote.hashCode ^
+      reporterName.hashCode ^
+      resolvedAt.hashCode;
 }

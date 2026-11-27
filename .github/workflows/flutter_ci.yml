@@ -1,0 +1,64 @@
+name: Flutter CI/CD
+
+on:
+  push:
+    branches: [ main, v1.0_dev, v1.1 ]
+  pull_request:
+    branches: [ main, v1.0_dev, v1.1 ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Analyze code
+      run: flutter analyze
+      
+    - name: Run tests
+      run: flutter test --coverage
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage/lcov.info
+        
+  build-android:
+    name: Build Android APK
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/v1.0_dev'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Build APK
+      run: flutter build apk --release
+      
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: campus-ghost-apk
+        path: build/app/outputs/flutter-apk/app-release.apk

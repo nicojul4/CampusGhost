@@ -49,12 +49,27 @@ Future<void> main() async {
     logger.warning('main', 'Firebase not configured, skipping initialization');
   }
 
+  const storage = FlutterSecureStorage();
+  final store = LocalCampusStore(storage);
+  bool? isDark;
+  try {
+    isDark = await store.readThemeMode();
+  } catch (e) {
+    logger.warning('main', 'Gagal membaca cache tema: $e');
+  }
+
+  final initialThemeMode =
+      isDark == true ? ThemeMode.dark : ThemeMode.light;
+
   runApp(ProviderScope(
     overrides: [
-      localCampusStoreProvider
-          .overrideWithValue(LocalCampusStore(const FlutterSecureStorage())),
+      localCampusStoreProvider.overrideWithValue(store),
     ],
-    child: CampusGhostApp(firebaseConfigured: configured),
+    child: CampusGhostApp(
+      firebaseConfigured: configured,
+      initialThemeMode: initialThemeMode,
+      store: store,
+    ),
   ));
 
   logger.info('main', 'Application ready');
