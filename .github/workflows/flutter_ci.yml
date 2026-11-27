@@ -47,8 +47,9 @@ jobs:
       continue-on-error: true
       
     - name: Upload coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       if: always()
+      continue-on-error: true
       with:
         files: ./coverage/lcov.info
         fail_ci_if_error: false
@@ -75,7 +76,7 @@ jobs:
       run: flutter build apk --release
       
     - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: campus-ghost-apk-${{ github.sha }}
         path: build/app/outputs/flutter-apk/app-release.apk
